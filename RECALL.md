@@ -152,6 +152,56 @@ def connected_components(graph: Dict[int, List[int]]) -> List[List[int]]:
     return components
 ```
 
+## [Topological Sort](topics/graphs/topological-sort.md) ★★★
+
+Topological sort orders the nodes of a **DAG** (directed acyclic graph) so that every directed edge `u → v` has `u` appearing before `v`. The signal is "build order," "course prerequisites," "task scheduling with constraints," "compile order," or any problem that requires respecting dependency chains. Two equivalent algorithms: **Kahn's** (BFS-based, peels in-degree-0 nodes level by level) and **DFS-based** (post-order reversed). Kahn's naturally detects cycles; DFS-based is cleaner if you already have DFS set up. Time: O(V + E). Space: O(V).
+
+```python
+from collections import deque
+from typing import Dict, List, Optional
+
+
+def kahn(graph: Dict[int, List[int]], n: int) -> Optional[List[int]]:
+    in_degree = [0] * n
+    for u in range(n):
+        for v in graph.get(u, []):
+            in_degree[v] += 1
+    queue: deque = deque(i for i in range(n) if in_degree[i] == 0)
+    result: List[int] = []
+    while queue:
+        u = queue.popleft()
+        result.append(u)
+        for v in graph.get(u, []):
+            in_degree[v] -= 1
+            if in_degree[v] == 0:
+                queue.append(v)
+    return result if len(result) == n else None
+
+
+def dfs_topo(graph: Dict[int, List[int]], n: int) -> Optional[List[int]]:
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color = [WHITE] * n
+    result: List[int] = []
+
+    def dfs(u: int) -> bool:
+        color[u] = GRAY
+        for v in graph.get(u, []):
+            if color[v] == GRAY:
+                return True
+            if color[v] == WHITE and dfs(v):
+                return True
+        color[u] = BLACK
+        result.append(u)
+        return False
+
+    for i in range(n):
+        if color[i] == WHITE:
+            if dfs(i):
+                return None
+    result.reverse()
+    return result
+```
+
 ## [Binary Search](topics/searching-sorting/binary-search.md) ★★★
 
 Binary search applies whenever you have a **sorted array** (or any monotonic predicate over an integer or real range): either to locate a target in O(log n), or to find the smallest/largest value satisfying some condition. The signal is "sorted input", "O(log n) required", or a feasibility check that flips from False to True exactly once as you move across a range. Time: O(log n). Space: O(1).

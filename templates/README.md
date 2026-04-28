@@ -13,3 +13,4 @@ For full context on any template, see the corresponding topic file under [`../to
 - [`sliding-window.py`](sliding-window.py) — longest_substring_no_repeat, min_window, max_sum_fixed_window, monotonic_deque_max
 - [`bfs.py`](bfs.py) — bfs_shortest_path, bfs_grid, bidirectional_bfs
 - [`dfs.py`](dfs.py) — dfs_recursive, dfs_iterative, has_cycle_directed, connected_components
+- [`topological-sort.py`](topological-sort.py) — kahn, dfs_topo
