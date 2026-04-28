@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     # quickselect smoke tests
     assert quickselect([3, 6, 8, 10, 1, 2, 1], 1) == 1   # smallest
-    assert quickselect([3, 6, 8, 10, 1, 2, 1], 4) == 6   # 4th smallest from [1,1,2,3,6,8,10]
+    assert quickselect([3, 6, 8, 10, 1, 2, 1], 4) == 3   # 4th smallest from [1,1,2,3,6,8,10]
     assert quickselect([3, 6, 8, 10, 1, 2, 1], 7) == 10  # largest
 
     print("All smoke tests passed.")
