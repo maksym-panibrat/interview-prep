@@ -1001,3 +1001,72 @@ def level_order(root: Optional[TreeNode]) -> List[int]:
             queue.append(node.right)
     return result
 ```
+
+## [Binary Search Tree](topics/trees/bst.md) ★★
+
+A Binary Search Tree (BST) is a binary tree where every node satisfies the **BST invariant**: all values in the left subtree are strictly less than the node's value, and all values in the right subtree are strictly greater. The signal is "binary search tree," "k-th smallest in a tree," "insert/delete/validate a sorted-property tree," or any query that exploits sorted order on a tree. Inorder traversal of a BST yields a sorted sequence. Search, insert, and delete are all O(h) where h = O(log n) for a balanced tree and O(n) for a skewed one. Space: O(h) for recursion stack.
+
+```python
+from typing import Optional
+
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+
+def validate_bst(root: Optional[TreeNode]) -> bool:
+    def _check(node, lo, hi):
+        if node is None:
+            return True
+        if not (lo < node.val < hi):
+            return False
+        return _check(node.left, lo, node.val) and _check(node.right, node.val, hi)
+    return _check(root, float("-inf"), float("inf"))
+
+
+def insert_bst(root: Optional[TreeNode], val: int) -> TreeNode:
+    if root is None:
+        return TreeNode(val)
+    if val < root.val:
+        root.left = insert_bst(root.left, val)
+    elif val > root.val:
+        root.right = insert_bst(root.right, val)
+    return root
+
+
+def delete_bst(root: Optional[TreeNode], val: int) -> Optional[TreeNode]:
+    if root is None:
+        return None
+    if val < root.val:
+        root.left = delete_bst(root.left, val)
+    elif val > root.val:
+        root.right = delete_bst(root.right, val)
+    else:
+        if root.left is None:
+            return root.right
+        if root.right is None:
+            return root.left
+        successor = root.right
+        while successor.left:
+            successor = successor.left
+        root.val = successor.val
+        root.right = delete_bst(root.right, successor.val)
+    return root
+
+
+def kth_smallest(root: Optional[TreeNode], k: int) -> int:
+    stack, curr, count = [], root, 0
+    while curr or stack:
+        while curr:
+            stack.append(curr)
+            curr = curr.left
+        curr = stack.pop()
+        count += 1
+        if count == k:
+            return curr.val
+        curr = curr.right
+    raise ValueError(f"k exceeds node count")
+```

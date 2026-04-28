@@ -37,6 +37,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [Rabin-Karp](topics/strings/rabin-karp.md)
 1. ★★ [Trie](topics/strings/trie.md)
 1. ★★ [Tree Traversals](topics/trees/traversals.md)
+1. ★★ [Binary Search Tree](topics/trees/bst.md)
 
 ## See also
 
