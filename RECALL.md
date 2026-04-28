@@ -659,3 +659,31 @@ def monotonic_deque_max(nums: List[int], k: int) -> List[int]:
             result.append(nums[dq[0]])
     return result
 ```
+
+## [1D DP](topics/dp/1d-dp.md) ★★★
+
+1D DP applies when a problem can be broken into subproblems that each depend on a small number of earlier states along a single axis: positions, values, or steps. The signal is "ways to reach state n," "max/min value ending at index i," "decode/parse with overlapping subproblems," or "fewest steps." Define `dp[i]` as the answer for the first `i` elements (or state at position `i`); each cell is a function of O(1) earlier cells. Time: O(n). Space: O(n), often reducible to O(1).
+
+```python
+from typing import List
+import bisect
+
+
+def house_robber(nums: List[int]) -> int:
+    prev2, prev1 = 0, 0
+    for n in nums:
+        curr = max(prev1, prev2 + n)
+        prev2, prev1 = prev1, curr
+    return prev1
+
+
+def lis(nums: List[int]) -> int:
+    tails: List[int] = []
+    for num in nums:
+        pos = bisect.bisect_left(tails, num)
+        if pos == len(tails):
+            tails.append(num)
+        else:
+            tails[pos] = num
+    return len(tails)
+```
