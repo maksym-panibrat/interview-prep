@@ -23,6 +23,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★★ [Two Pointers](topics/two-pointers-sliding-window/two-pointers.md)
 1. ★★★ [Fast/Slow Pointers](topics/two-pointers-sliding-window/fast-slow-pointers.md)
 1. ★★★ [Sliding Window](topics/two-pointers-sliding-window/sliding-window.md)
+1. ★★★ [BFS](topics/graphs/bfs.md)
 
 ## See also
 
