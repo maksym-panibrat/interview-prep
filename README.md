@@ -17,6 +17,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 ## Study order
 
 <!-- entries appended by per-topic tasks; final ordering finalized in Task 44 -->
+- ★★★ [Binary Search](topics/searching-sorting/binary-search.md)
 
 ## See also
 

@@ -7,3 +7,4 @@ For full context on any template, see the corresponding topic file under [`../to
 ## Index
 
 <!-- entries appended by per-topic tasks (only for templated topics, see spec §3) -->
+- [`binary-search.py`](binary-search.py) — classic, leftmost, rightmost, search-on-answer

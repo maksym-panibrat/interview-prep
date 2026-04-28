@@ -1,16 +1,4 @@
-# Recall Cards
-
-The "30 minutes before the interview" file. Each section is a single topic's TL;DR plus its Template code block, copied verbatim from the full topic file. Sections appear in study order.
-
-For full explanations, walkthroughs, and problem sets, follow the link on each topic heading.
-
-<!-- card sections appended by per-topic tasks -->
-
-## [Binary Search](topics/searching-sorting/binary-search.md) ★★★
-
-Binary search applies whenever you have a **sorted array** (or any monotonic predicate over an integer or real range): either to locate a target in O(log n), or to find the smallest/largest value satisfying some condition. The signal is "sorted input", "O(log n) required", or a feasibility check that flips from False to True exactly once as you move across a range. Time: O(log n). Space: O(1).
-
-```python
+"""Binary search templates. See ../topics/searching-sorting/binary-search.md."""
 from typing import Callable, List
 
 
@@ -57,4 +45,3 @@ def search_on_answer(lo: int, hi: int, feasible: Callable[[int], bool]) -> int:
         else:
             lo = mid + 1
     return lo
-```
