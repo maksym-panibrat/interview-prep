@@ -1523,3 +1523,46 @@ def modinv(a: int, m: int) -> Optional[int]:
         return None
     return x % m
 ```
+
+## [Sieve of Eratosthenes](topics/math/sieve.md) ★★
+
+Sieve of Eratosthenes: mark composites by walking multiples of each prime p starting at p². Total work ≈ O(N log log N). SPF table gives O(log n) factorization: `spf[i]` = smallest prime dividing `i`; divide by `spf[n]` repeatedly. Signal: "primes up to N," "count primes," batch factorizations. Pitfalls: array must be length N+1; start inner loop at p², not 2p; for single huge numbers use Miller-Rabin instead.
+
+```python
+import math
+
+
+def sieve(n: int) -> list[int]:
+    if n < 2:
+        return []
+    is_prime = [True] * (n + 1)
+    is_prime[0] = is_prime[1] = False
+    for p in range(2, math.isqrt(n) + 1):
+        if is_prime[p]:
+            for multiple in range(p * p, n + 1, p):
+                is_prime[multiple] = False
+    return [i for i, flag in enumerate(is_prime) if flag]
+
+
+def smallest_prime_factor(n: int) -> list[int]:
+    if n < 2:
+        return [0] * (n + 1)
+    spf = list(range(n + 1))
+    spf[0] = spf[1] = 0
+    for p in range(2, math.isqrt(n) + 1):
+        if spf[p] == p:
+            for multiple in range(p * p, n + 1, p):
+                if spf[multiple] == multiple:
+                    spf[multiple] = p
+    return spf
+
+
+def factorize(n: int, spf: list[int]) -> dict[int, int]:
+    factors: dict[int, int] = {}
+    while n > 1:
+        p = spf[n]
+        while n % p == 0:
+            factors[p] = factors.get(p, 0) + 1
+            n //= p
+    return factors
+```
