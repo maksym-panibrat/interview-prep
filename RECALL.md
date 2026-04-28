@@ -886,3 +886,48 @@ def rabin_karp(text: str, pattern: str) -> List[int]:
             win_hash %= MOD
     return results
 ```
+
+## [Trie](topics/strings/trie.md) ★★
+
+A trie (prefix tree) is a tree where each root-to-node path spells out a prefix and each node holds children plus an end-of-word marker. The signal is **prefix matching**, autocomplete, "word search II," dictionary lookups with wildcards, multi-pattern search, or longest-common-prefix queries. Every `insert`, `search`, and `startsWith` is O(L) where L is the word length — independent of how many words are stored. Space: O(N · L) worst case.
+
+```python
+from typing import Dict
+
+
+class TrieNode:
+    __slots__ = ("children", "is_end")
+
+    def __init__(self) -> None:
+        self.children: Dict[str, "TrieNode"] = {}
+        self.is_end: bool = False
+
+
+class Trie:
+    def __init__(self) -> None:
+        self.root = TrieNode()
+
+    def insert(self, word: str) -> None:
+        node = self.root
+        for ch in word:
+            if ch not in node.children:
+                node.children[ch] = TrieNode()
+            node = node.children[ch]
+        node.is_end = True
+
+    def search(self, word: str) -> bool:
+        node = self.root
+        for ch in word:
+            if ch not in node.children:
+                return False
+            node = node.children[ch]
+        return node.is_end
+
+    def startsWith(self, prefix: str) -> bool:
+        node = self.root
+        for ch in prefix:
+            if ch not in node.children:
+                return False
+            node = node.children[ch]
+        return True
+```
