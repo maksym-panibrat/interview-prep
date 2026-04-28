@@ -687,3 +687,35 @@ def lis(nums: List[int]) -> int:
             tails[pos] = num
     return len(tails)
 ```
+
+## [2D DP](topics/dp/2d-dp.md) ★★★
+
+2D DP applies when the problem involves two strings, two arrays, or a grid, and the answer for a pair of prefixes (or a grid cell) can be built from three neighboring subproblems. The signal is "edit distance," "LCS," "knapsack," "unique paths," or "interleaving." Define `dp[i][j]` as the answer for the first `i` elements of one input and first `j` of the other (or position `(i,j)` in a grid); transitions look at `(i-1,j)`, `(i,j-1)`, and `(i-1,j-1)`. Time: O(n·m). Space: O(n·m), often reducible to O(min(n,m)).
+
+```python
+from typing import List
+
+
+def edit_distance(a: str, b: str) -> int:
+    if len(a) < len(b):
+        a, b = b, a
+    n, m = len(a), len(b)
+    prev = list(range(m + 1))
+    for i in range(1, n + 1):
+        curr = [i] + [0] * m
+        for j in range(1, m + 1):
+            if a[i - 1] == b[j - 1]:
+                curr[j] = prev[j - 1]
+            else:
+                curr[j] = 1 + min(prev[j], curr[j - 1], prev[j - 1])
+        prev = curr
+    return prev[m]
+
+
+def knapsack_01(weights: List[int], values: List[int], capacity: int) -> int:
+    dp = [0] * (capacity + 1)
+    for w, v in zip(weights, values):
+        for cap in range(capacity, w - 1, -1):  # descending → 0/1 (each item once)
+            dp[cap] = max(dp[cap], dp[cap - w] + v)
+    return dp[capacity]
+```
