@@ -1227,3 +1227,38 @@ def max_non_overlapping(intervals: List[List[int]]) -> int:
             last_end = end
     return count
 ```
+
+## [Activity Selection (and Huffman name-drop)](topics/greedy/activity-selection.md) ★★
+
+Activity selection asks you to pick the maximum number of non-overlapping activities (or jobs, intervals) from a set. The signal is "select max compatible activities," "maximum non-overlapping subset," or "maximize number of tasks that can be scheduled." Sort by finish time, then sweep: greedily pick each activity whose start time is at or after the last chosen finish time. Correctness is guaranteed by an exchange argument. Time: O(n log n) sort + O(n) sweep. Space: O(n).
+
+```python
+import heapq
+from typing import List, Tuple
+
+
+def activity_selection(activities: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+    sorted_acts = sorted(activities, key=lambda x: x[1])
+    selected: List[Tuple[int, int]] = []
+    last_end = float("-inf")
+    for start, end in sorted_acts:
+        if start >= last_end:
+            selected.append((start, end))
+            last_end = end
+    return selected
+
+
+def huffman_cost(freqs: List[int]) -> int:
+    if len(freqs) <= 1:
+        return 0
+    heap = list(freqs)
+    heapq.heapify(heap)
+    total_cost = 0
+    while len(heap) > 1:
+        a = heapq.heappop(heap)
+        b = heapq.heappop(heap)
+        merge = a + b
+        total_cost += merge
+        heapq.heappush(heap, merge)
+    return total_cost
+```
