@@ -235,3 +235,65 @@ def container_with_most_water(heights: List[int]) -> int:
             r -= 1
     return max_water
 ```
+
+## [Fast/Slow Pointers](topics/two-pointers-sliding-window/fast-slow-pointers.md) ★★★
+
+Fast/slow pointers (Floyd's tortoise and hare) detect cycles in linked lists and functional sequences in O(n) time and O(1) space. The signal is "linked-list cycle," "find middle of linked list," "k-th from end," "palindrome linked list," or "find duplicate in array treated as a graph." Move `slow` by one step and `fast` by two; if they ever meet, a cycle exists. A second phase — resetting `slow` to head and stepping both by one — locates the cycle's entry point exactly. Time: O(n). Space: O(1).
+
+```python
+from typing import Optional
+
+
+class ListNode:
+    def __init__(self, val: int = 0, next: "Optional[ListNode]" = None) -> None:
+        self.val = val
+        self.next = next
+
+
+def has_cycle(head: Optional[ListNode]) -> bool:
+    slow = fast = head
+    while fast is not None and fast.next is not None:
+        slow = slow.next          # type: ignore[assignment]
+        fast = fast.next.next
+        if slow is fast:
+            return True
+    return False
+
+
+def detect_cycle(head: Optional[ListNode]) -> Optional[ListNode]:
+    slow = fast = head
+    while fast is not None and fast.next is not None:
+        slow = slow.next          # type: ignore[assignment]
+        fast = fast.next.next
+        if slow is fast:
+            break
+    else:
+        return None
+    slow = head
+    while slow is not fast:
+        slow = slow.next          # type: ignore[assignment]
+        fast = fast.next          # type: ignore[union-attr]
+    return slow
+
+
+def find_middle(head: Optional[ListNode]) -> Optional[ListNode]:
+    slow = fast = head
+    while fast is not None and fast.next is not None:
+        slow = slow.next          # type: ignore[assignment]
+        fast = fast.next.next
+    return slow
+
+
+def find_duplicate(nums: list) -> int:
+    slow = fast = nums[0]
+    while True:
+        slow = nums[slow]
+        fast = nums[nums[fast]]
+        if slow == fast:
+            break
+    slow = nums[0]
+    while slow != fast:
+        slow = nums[slow]
+        fast = nums[fast]
+    return slow
+```
