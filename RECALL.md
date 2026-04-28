@@ -1341,3 +1341,69 @@ def combination_sum(candidates: List[int], target: int) -> List[List[int]]:
     backtrack(0, target)
     return result
 ```
+
+## [N-Queens & Sudoku](topics/backtracking/n-queens-sudoku.md) ★★
+
+N-Queens and Sudoku Solver are constraint-satisfaction problems solved with the same backtracking template as subsets and permutations: build the solution row-by-row (or empty-cell-by-empty-cell), enumerate only candidates that don't conflict with the current partial state, place, recurse, and undo. The signal is "place queens such that no two attack each other," "fill the Sudoku board," or any combinatorial search with explicit row/column/diagonal/region conflict constraints. Time: O(N!) for N-Queens (heavily pruned in practice); Sudoku is NP-hard in theory but runs instantly for 9×9. Space: O(N) recursion depth plus conflict sets.
+
+```python
+from typing import List
+
+
+def solve_n_queens(n: int) -> List[List[str]]:
+    results: List[List[str]] = []
+    placement: List[int] = []
+    cols: set[int] = set()
+    pos_diag: set[int] = set()
+    neg_diag: set[int] = set()
+
+    def backtrack(row: int) -> None:
+        if row == n:
+            results.append(["." * c + "Q" + "." * (n - c - 1) for c in placement])
+            return
+        for col in range(n):
+            if col in cols or (row + col) in pos_diag or (row - col) in neg_diag:
+                continue
+            cols.add(col); pos_diag.add(row + col); neg_diag.add(row - col)
+            placement.append(col)
+            backtrack(row + 1)
+            cols.remove(col); pos_diag.remove(row + col); neg_diag.remove(row - col)
+            placement.pop()
+
+    backtrack(0)
+    return results
+
+
+def solve_sudoku(board: List[List[str]]) -> None:
+    rows: List[set[str]] = [set() for _ in range(9)]
+    cols: List[set[str]] = [set() for _ in range(9)]
+    boxes: List[set[str]] = [set() for _ in range(9)]
+    empty: List[tuple[int, int]] = []
+
+    for r in range(9):
+        for c in range(9):
+            d = board[r][c]
+            if d != ".":
+                box_id = (r // 3) * 3 + (c // 3)
+                rows[r].add(d); cols[c].add(d); boxes[box_id].add(d)
+            else:
+                empty.append((r, c))
+
+    def backtrack(idx: int) -> bool:
+        if idx == len(empty):
+            return True
+        r, c = empty[idx]
+        box_id = (r // 3) * 3 + (c // 3)
+        for d in "123456789":
+            if d in rows[r] or d in cols[c] or d in boxes[box_id]:
+                continue
+            board[r][c] = d
+            rows[r].add(d); cols[c].add(d); boxes[box_id].add(d)
+            if backtrack(idx + 1):
+                return True
+            board[r][c] = "."
+            rows[r].remove(d); cols[c].remove(d); boxes[box_id].remove(d)
+        return False
+
+    backtrack(0)
+```
