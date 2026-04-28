@@ -54,6 +54,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★ [Reservoir Sampling](topics/nice-to-have/reservoir-sampling.md)
 1. ★ [Manacher's Algorithm](topics/nice-to-have/manacher.md)
 1. ★ [Z-Algorithm](topics/nice-to-have/z-algorithm.md)
+1. ★ [Tarjan's & Kosaraju's (SCC)](topics/nice-to-have/tarjan-kosaraju.md)
 
 ## See also
 

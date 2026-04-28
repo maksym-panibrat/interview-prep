@@ -1866,3 +1866,113 @@ def z_search(text: str, pattern: str) -> list[int]:
     Z = z_function(pattern + "$" + text)
     return [i - m - 1 for i in range(m + 1, len(Z)) if Z[i] >= m]
 ```
+
+## [Tarjan's & Kosaraju's (SCC)](topics/nice-to-have/tarjan-kosaraju.md) ★
+
+Tarjan's and Kosaraju's algorithms find **Strongly Connected Components (SCCs)** — maximal subsets of nodes in a directed graph where every node can reach every other. Signal: "critical connections," "mutually reachable groups," "condensation DAG," 2-SAT. Tarjan uses a single DFS with `disc`/`low` arrays; Kosaraju uses two DFS passes (original graph then transposed). Both O(V + E). An SCC root in Tarjan: `low[v] == disc[v]`. Bridges reuse the same low-link: edge `(u,v)` is a bridge if `low[v] > disc[u]`.
+
+```python
+from typing import List, Tuple
+
+
+def kosaraju(n: int, edges: List[Tuple[int, int]]) -> List[List[int]]:
+    graph: List[List[int]] = [[] for _ in range(n)]
+    trans: List[List[int]] = [[] for _ in range(n)]
+    for u, v in edges:
+        graph[u].append(v)
+        trans[v].append(u)
+
+    visited = [False] * n
+    finish_order: List[int] = []
+
+    def dfs1(start: int) -> None:
+        stack = [(start, 0)]
+        visited[start] = True
+        while stack:
+            node, idx = stack[-1]
+            if idx < len(graph[node]):
+                stack[-1] = (node, idx + 1)
+                nb = graph[node][idx]
+                if not visited[nb]:
+                    visited[nb] = True
+                    stack.append((nb, 0))
+            else:
+                stack.pop()
+                finish_order.append(node)
+
+    for v in range(n):
+        if not visited[v]:
+            dfs1(v)
+
+    visited2 = [False] * n
+    sccs: List[List[int]] = []
+
+    def dfs2(start: int) -> List[int]:
+        component: List[int] = []
+        stack = [start]
+        visited2[start] = True
+        while stack:
+            node = stack.pop()
+            component.append(node)
+            for nb in trans[node]:
+                if not visited2[nb]:
+                    visited2[nb] = True
+                    stack.append(nb)
+        return component
+
+    for v in reversed(finish_order):
+        if not visited2[v]:
+            sccs.append(sorted(dfs2(v)))
+    return sccs
+
+
+def tarjan(n: int, edges: List[Tuple[int, int]]) -> List[List[int]]:
+    graph: List[List[int]] = [[] for _ in range(n)]
+    for u, v in edges:
+        graph[u].append(v)
+
+    disc = [-1] * n
+    low = [0] * n
+    on_stack = [False] * n
+    scc_stack: List[int] = []
+    timer = [0]
+    sccs: List[List[int]] = []
+
+    def dfs(start: int) -> None:
+        call_stack = [(start, 0)]
+        disc[start] = low[start] = timer[0]
+        timer[0] += 1
+        scc_stack.append(start)
+        on_stack[start] = True
+        while call_stack:
+            v, idx = call_stack[-1]
+            if idx < len(graph[v]):
+                call_stack[-1] = (v, idx + 1)
+                w = graph[v][idx]
+                if disc[w] == -1:
+                    disc[w] = low[w] = timer[0]
+                    timer[0] += 1
+                    scc_stack.append(w)
+                    on_stack[w] = True
+                    call_stack.append((w, 0))
+                elif on_stack[w]:
+                    low[v] = min(low[v], disc[w])
+            else:
+                call_stack.pop()
+                if call_stack:
+                    low[call_stack[-1][0]] = min(low[call_stack[-1][0]], low[v])
+                if low[v] == disc[v]:
+                    scc: List[int] = []
+                    while True:
+                        w = scc_stack.pop()
+                        on_stack[w] = False
+                        scc.append(w)
+                        if w == v:
+                            break
+                    sccs.append(sorted(scc))
+
+    for v in range(n):
+        if disc[v] == -1:
+            dfs(v)
+    return sccs
+```
