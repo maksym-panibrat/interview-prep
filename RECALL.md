@@ -1777,3 +1777,34 @@ class FlowNetwork:
             flow += path_flow
         return flow
 ```
+
+## [Reservoir Sampling](topics/nice-to-have/reservoir-sampling.md) ★
+
+Reservoir sampling gives you a **uniformly random sample of k items from a stream of unknown size** without storing the whole stream. The signal is "pick k random elements from a stream," "data doesn't fit in memory," or "uniform random sample without knowing n in advance." For k=1: keep the first element; on the i-th element replace with probability `1/i`. For general k: fill the reservoir with the first k elements; on the i-th element (i > k) replace a random reservoir slot with probability `k/i`. Time: O(n). Space: O(k).
+
+```python
+import random
+from typing import Iterator, List, TypeVar
+
+T = TypeVar("T")
+
+
+def reservoir_sample_one(stream: Iterator[T]) -> T:
+    reservoir = next(stream)
+    for i, item in enumerate(stream, start=2):
+        if random.randrange(i) == 0:
+            reservoir = item
+    return reservoir
+
+
+def reservoir_sample_k(stream: Iterator[T], k: int) -> List[T]:
+    reservoir: List[T] = []
+    for i, item in enumerate(stream, start=1):
+        if len(reservoir) < k:
+            reservoir.append(item)
+        else:
+            j = random.randrange(i)
+            if j < k:
+                reservoir[j] = item
+    return reservoir
+```
