@@ -853,3 +853,36 @@ def kmp_search(text: str, pattern: str) -> List[int]:
                 i += 1
     return results
 ```
+
+## [Rabin-Karp](topics/strings/rabin-karp.md) ★★
+
+Rabin-Karp finds a pattern of length m in a text of length n by treating each window as a polynomial hash and sliding it in O(1) per step. The signal is "find substring or k-length window with hash equality," plagiarism / repeated-substring detection, or any rolling-hash sliding window over a string. Average time is O(n + m); naïve verification on every hash hit gives O(nm) worst case with adversarial collisions. Space: O(1) beyond the input.
+
+```python
+from typing import List
+
+BASE = 257
+MOD = 10**9 + 7
+
+
+def rabin_karp(text: str, pattern: str) -> List[int]:
+    n, m = len(text), len(pattern)
+    if m == 0:
+        return list(range(n + 1))
+    if m > n:
+        return []
+    high_base = pow(BASE, m - 1, MOD)
+    pat_hash = win_hash = 0
+    for i in range(m):
+        pat_hash = (pat_hash * BASE + ord(pattern[i])) % MOD
+        win_hash = (win_hash * BASE + ord(text[i])) % MOD
+    results: List[int] = []
+    for l in range(n - m + 1):
+        if win_hash == pat_hash and text[l:l + m] == pattern:
+            results.append(l)
+        if l + m < n:
+            win_hash = (win_hash - ord(text[l]) * high_base) % MOD
+            win_hash = (win_hash * BASE + ord(text[l + m])) % MOD
+            win_hash %= MOD
+    return results
+```

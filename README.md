@@ -34,6 +34,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★★ [Tree DP](topics/dp/tree-dp.md)
 1. ★★★ [Bitmask DP](topics/dp/bitmask-dp.md)
 1. ★★ [KMP](topics/strings/kmp.md)
+1. ★★ [Rabin-Karp](topics/strings/rabin-karp.md)
 
 ## See also
 
