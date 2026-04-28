@@ -1070,3 +1070,46 @@ def kth_smallest(root: Optional[TreeNode], k: int) -> int:
         curr = curr.right
     raise ValueError(f"k exceeds node count")
 ```
+
+## [Lowest Common Ancestor](topics/trees/lca.md) ★★
+
+LCA (Lowest Common Ancestor) finds the deepest node that is an ancestor of both target nodes in a tree. The signal is "lowest common ancestor of two nodes," "distance between two nodes in a tree," or "shortest path between two nodes in an undirected tree." Recursive post-order DFS is the workhorse: return the current node if it matches either target; otherwise combine results from left and right subtrees — if both sides return non-null, the current node is the LCA. Time: O(n) per query. Space: O(h) recursion stack.
+
+```python
+from typing import Optional
+
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+
+def lca(root: Optional[TreeNode],
+        p: TreeNode,
+        q: TreeNode) -> Optional[TreeNode]:
+    if root is None:
+        return None
+    if root is p or root is q:
+        return root
+    left = lca(root.left, p, q)
+    right = lca(root.right, p, q)
+    if left is not None and right is not None:
+        return root
+    return left if left is not None else right
+
+
+def lca_bst(root: Optional[TreeNode],
+            p: TreeNode,
+            q: TreeNode) -> Optional[TreeNode]:
+    node = root
+    while node is not None:
+        if p.val < node.val and q.val < node.val:
+            node = node.left
+        elif p.val > node.val and q.val > node.val:
+            node = node.right
+        else:
+            return node
+    return None
+```

@@ -38,6 +38,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [Trie](topics/strings/trie.md)
 1. ★★ [Tree Traversals](topics/trees/traversals.md)
 1. ★★ [Binary Search Tree](topics/trees/bst.md)
+1. ★★ [Lowest Common Ancestor](topics/trees/lca.md)
 
 ## See also
 
