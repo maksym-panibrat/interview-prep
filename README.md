@@ -19,6 +19,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 <!-- entries appended by per-topic tasks; final ordering finalized in Task 44 -->
 1. ★★★ [Binary Search](topics/searching-sorting/binary-search.md)
 1. ★★★ [Quicksort & Mergesort](topics/searching-sorting/quicksort-mergesort.md)
+1. ★★★ [Heapsort & Heaps](topics/searching-sorting/heapsort.md)
 
 ## See also
 
