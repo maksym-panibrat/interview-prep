@@ -1486,3 +1486,40 @@ def word_search_ii(board: List[List[str]], words: List[str]) -> List[str]:
             dfs(r, c, root)
     return found
 ```
+
+## [GCD](topics/math/gcd.md) ★★
+
+GCD (Greatest Common Divisor) computes the largest integer that divides both `a` and `b` using the Euclidean recurrence `gcd(a, b) = gcd(b, a mod b)`. The signal is "common factor," "fraction in lowest terms," "LCM," "lattice problems on integers," or "modular inverse via extended Euclidean." Extended Euclidean additionally returns Bézout coefficients `x, y` satisfying `a*x + b*y = gcd(a, b)` — the basis for modular inverses. Time: O(log(min(a, b))). Space: O(1) iterative.
+
+```python
+from functools import reduce
+from typing import Optional
+
+
+def gcd(a: int, b: int) -> int:
+    a, b = abs(a), abs(b)
+    while b:
+        a, b = b, a % b
+    return a
+
+
+def lcm(a: int, b: int) -> int:
+    if a == 0 or b == 0:
+        return 0
+    return abs(a) // gcd(a, b) * abs(b)
+
+
+def extgcd(a: int, b: int) -> tuple[int, int, int]:
+    if b == 0:
+        return a, 1, 0
+    g, x1, y1 = extgcd(b, a % b)
+    q = a // b
+    return g, y1, x1 - q * y1
+
+
+def modinv(a: int, m: int) -> Optional[int]:
+    g, x, _ = extgcd(a % m, m)
+    if g != 1:
+        return None
+    return x % m
+```
