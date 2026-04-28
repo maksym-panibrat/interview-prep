@@ -48,6 +48,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [GCD](topics/math/gcd.md)
 1. ★★ [Sieve of Eratosthenes](topics/math/sieve.md)
 1. ★★ [Fast Exponentiation](topics/math/fast-exponentiation.md)
+1. ★ [A* Search](topics/nice-to-have/a-star.md)
 
 ## See also
 

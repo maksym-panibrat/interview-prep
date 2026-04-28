@@ -1616,3 +1616,47 @@ def mat_pow(M, n, mod=None):
         n >>= 1
     return result
 ```
+
+## [A* Search](topics/nice-to-have/a-star.md) ★
+
+A* finds shortest paths in large state spaces where Dijkstra is too slow but a good heuristic exists. Signal: grid pathfinding, sliding puzzles, or any weighted shortest-path problem where you can cheaply estimate remaining cost. Key idea: Dijkstra prioritizes nodes by `g(n)` (cost so far); A* prioritizes by `f(n) = g(n) + h(n)` where `h(n)` is an **admissible** heuristic (never overestimates). With a **consistent** heuristic A* is provably optimal and expands far fewer nodes than Dijkstra. Time: O((V + E) log V) worst case; O(d) with a perfect heuristic. Space: O(V).
+
+```python
+import heapq
+from typing import Callable, Hashable, Iterable, Optional, TypeVar
+
+S = TypeVar("S")
+
+
+def astar(
+    start: S,
+    goal: S,
+    neighbors: Callable[[S], Iterable[tuple[S, float]]],
+    heuristic: Callable[[S], float],
+) -> Optional[list[S]]:
+    g: dict[S, float] = {start: 0.0}
+    prev: dict[S, Optional[S]] = {start: None}
+    counter = 0
+    heap: list[tuple[float, int, S]] = [(heuristic(start), 0, start)]  # type: ignore[type-var]
+    while heap:
+        f, _, state = heapq.heappop(heap)
+        if state == goal:
+            path: list[S] = []
+            node: Optional[S] = goal
+            while node is not None:
+                path.append(node)
+                node = prev[node]
+            path.reverse()
+            return path
+        g_state = g.get(state, float("inf"))
+        if f - heuristic(state) > g_state + 1e-9:
+            continue
+        for nb, cost in neighbors(state):
+            ng = g_state + cost
+            if ng < g.get(nb, float("inf")):
+                g[nb] = ng
+                prev[nb] = state
+                counter += 1
+                heapq.heappush(heap, (ng + heuristic(nb), counter, nb))
+    return None
+```
