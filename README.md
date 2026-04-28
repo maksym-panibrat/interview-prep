@@ -32,6 +32,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★★ [2D DP](topics/dp/2d-dp.md)
 1. ★★★ [Interval DP](topics/dp/interval-dp.md)
 1. ★★★ [Tree DP](topics/dp/tree-dp.md)
+1. ★★★ [Bitmask DP](topics/dp/bitmask-dp.md)
 
 ## See also
 

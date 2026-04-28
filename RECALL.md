@@ -775,3 +775,32 @@ def tree_dp(root: Optional[TreeNode]):
     result = dfs(root)
     return max(result)
 ```
+
+## [Bitmask DP](topics/dp/bitmask-dp.md) ★★★
+
+Bitmask DP applies when N is small (≤ ~20) and you need to track which subset of N elements has been processed. The signal is "visit all cities/jobs/nodes," TSP-like constraints, or "cover all requirements with a subset." Encode the processed subset as an integer bitmask; `dp[mask]` (or `dp[mask][i]`) gives the optimal answer when exactly the elements in `mask` have been used. Time: O(2^N · N). Space: O(2^N · N).
+
+```python
+def bitmask_dp(n, cost_matrix) -> int:
+    INF = float("inf")
+    # dp[mask][i]: optimal value having used subset `mask`, currently at element i
+    dp = [[INF] * n for _ in range(1 << n)]
+    dp[1][0] = 0  # base case: start at element 0, mask = {0}
+
+    for mask in range(1, 1 << n):
+        for i in range(n):
+            if not (mask & (1 << i)):
+                continue
+            if dp[mask][i] == INF:
+                continue
+            for j in range(n):
+                if mask & (1 << j):
+                    continue
+                new_mask = mask | (1 << j)
+                cost = dp[mask][i] + cost_matrix[i][j]   # transition cost
+                if cost < dp[new_mask][j]:
+                    dp[new_mask][j] = cost
+
+    full = (1 << n) - 1
+    return int(min(dp[full][i] + cost_matrix[i][0] for i in range(n)))
+```
