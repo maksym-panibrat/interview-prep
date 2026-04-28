@@ -931,3 +931,73 @@ class Trie:
             node = node.children[ch]
         return True
 ```
+
+## [Tree Traversals](topics/trees/traversals.md) ★★
+
+Tree traversal applies whenever you need to visit every node in a binary tree: serialize/deserialize, convert a tree to a list, or check a structural property. The signal is "binary-tree shaped," "visit all nodes," or "process in some order." Four canonical orders exist — pre-, in-, post-, and level-order — each with a recursive one-liner and a tractable iterative counterpart. Time: O(n). Space: O(h) where h is tree height (O(log n) balanced, O(n) worst-case).
+
+```python
+from collections import deque
+from typing import List, Optional
+
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+
+def preorder(root: Optional[TreeNode]) -> List[int]:
+    if root is None:
+        return []
+    result, stack = [], [root]
+    while stack:
+        node = stack.pop()
+        result.append(node.val)
+        if node.right:
+            stack.append(node.right)
+        if node.left:
+            stack.append(node.left)
+    return result
+
+
+def inorder(root: Optional[TreeNode]) -> List[int]:
+    result, stack, curr = [], [], root
+    while curr or stack:
+        while curr:
+            stack.append(curr)
+            curr = curr.left
+        curr = stack.pop()
+        result.append(curr.val)
+        curr = curr.right
+    return result
+
+
+def postorder(root: Optional[TreeNode]) -> List[int]:
+    if root is None:
+        return []
+    stack1, stack2 = [root], []
+    while stack1:
+        node = stack1.pop()
+        stack2.append(node)
+        if node.left:
+            stack1.append(node.left)
+        if node.right:
+            stack1.append(node.right)
+    return [n.val for n in reversed(stack2)]
+
+
+def level_order(root: Optional[TreeNode]) -> List[int]:
+    if root is None:
+        return []
+    result, queue = [], deque([root])
+    while queue:
+        node = queue.popleft()
+        result.append(node.val)
+        if node.left:
+            queue.append(node.left)
+        if node.right:
+            queue.append(node.right)
+    return result
+```

@@ -36,6 +36,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [KMP](topics/strings/kmp.md)
 1. ★★ [Rabin-Karp](topics/strings/rabin-karp.md)
 1. ★★ [Trie](topics/strings/trie.md)
+1. ★★ [Tree Traversals](topics/trees/traversals.md)
 
 ## See also
 
