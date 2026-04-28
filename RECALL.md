@@ -202,6 +202,46 @@ def dfs_topo(graph: Dict[int, List[int]], n: int) -> Optional[List[int]]:
     return result
 ```
 
+## [Union-Find](topics/graphs/union-find.md) ★★★
+
+Union-Find (Disjoint Set Union, DSU) answers "are A and B in the same connected component?" and "merge two components" in nearly O(1) amortized time per operation. The signal is **incremental connectivity**: edges arrive one by one and you need to query or track connected components after each addition. Classic applications include Kruskal's MST, "number of connected components after online edge insertions," equivalence classes, and redundant connections. Time: O(α(n)) amortized per operation (inverse Ackermann — effectively constant for any practical n). Space: O(n).
+
+```python
+from typing import List
+
+
+class UnionFind:
+    def __init__(self, n: int) -> None:
+        self.parent: List[int] = list(range(n))
+        self.rank: List[int] = [0] * n
+        self.size: List[int] = [1] * n
+        self.num_components: int = n
+
+    def find(self, x: int) -> int:
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])
+        return self.parent[x]
+
+    def union(self, x: int, y: int) -> bool:
+        rx, ry = self.find(x), self.find(y)
+        if rx == ry:
+            return False
+        if self.rank[rx] < self.rank[ry]:
+            rx, ry = ry, rx
+        self.parent[ry] = rx
+        self.size[rx] += self.size[ry]
+        if self.rank[rx] == self.rank[ry]:
+            self.rank[rx] += 1
+        self.num_components -= 1
+        return True
+
+    def connected(self, x: int, y: int) -> bool:
+        return self.find(x) == self.find(y)
+
+    def component_size(self, x: int) -> int:
+        return self.size[self.find(x)]
+```
+
 ## [Binary Search](topics/searching-sorting/binary-search.md) ★★★
 
 Binary search applies whenever you have a **sorted array** (or any monotonic predicate over an integer or real range): either to locate a target in O(log n), or to find the smallest/largest value satisfying some condition. The signal is "sorted input", "O(log n) required", or a feasibility check that flips from False to True exactly once as you move across a range. Time: O(log n). Space: O(1).
