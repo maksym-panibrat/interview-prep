@@ -275,6 +275,7 @@ Replace each `set` with an integer bitmask. For N-Queens, three integers `cols_m
 
 - [Backtracking Template](backtracking-template.md) — the try/recurse/undo skeleton that both N-Queens and Sudoku instantiate directly.
 - [Bitmask DP](../dp/bitmask-dp.md) — bitmask conflict tracking is the same trick: a single integer encodes a set of occupied positions; bitwise AND/OR/NOT replace set operations.
+- [Grid Backtracking](grid-search.md) — the same mutate-restore discipline applied to pathfinding on a 2-D board; N-Queens constrains placements by row/col/diagonal while grid search constrains by visited cells.
 
 ## 9. Interviewer follow-ups
 

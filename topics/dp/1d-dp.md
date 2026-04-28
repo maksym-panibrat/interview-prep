@@ -177,9 +177,9 @@ Naive O(n²): `dp[i] = 1 + max(dp[j] for j < i if nums[j] < nums[i])`. The O(n l
 
 ## 8. Related patterns
 
-- **2D DP** (`2d-dp.md`) — extends the state to two dimensions when two inputs (two strings, a grid) interact; builds directly on 1D DP intuition.
-- **Tree DP** (`tree-dp.md`) — applies the same "summarize subtree in a small state tuple" idea on tree structure instead of a linear array.
-- **Interval Scheduling** (`../greedy/interval-scheduling.md`) — some scheduling problems that look like DP admit greedy solutions; knowing the boundary sharpens both skills.
+- **[2D DP](2d-dp.md)** — extends the state to two dimensions when two inputs (two strings, a grid) interact; builds directly on 1D DP intuition.
+- **[Tree DP](tree-dp.md)** — applies the same "summarize subtree in a small state tuple" idea on tree structure instead of a linear array.
+- **[Interval Scheduling](../greedy/interval-scheduling.md)** — some scheduling problems that look like DP admit greedy solutions; knowing the boundary sharpens both skills.
 
 ## 9. Interviewer follow-ups
 

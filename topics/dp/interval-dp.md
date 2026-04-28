@@ -175,7 +175,7 @@ Adds a third dimension for the count of equal boxes attached to the left boundar
 
 - [1D DP](1d-dp.md) — foundation; 1D DP recurrences are the building blocks for interval DP cells.
 - [2D DP](2d-dp.md) — interval DP tables are 2D but with the special constraint that only cells where `i ≤ j` matter and subproblems are nested intervals.
-- **Segment Tree & Fenwick Tree** — for range *queries* on static or mutable arrays (sum, min, max over `[l, r]`); often confused with interval DP but solves a different class of problems.
+- **[Segment Tree & Fenwick Tree](../trees/segment-tree-fenwick.md)** — for range *queries* on static or mutable arrays (sum, min, max over `[l, r]`); often confused with interval DP but solves a different class of problems.
 
 ## 9. Interviewer follow-ups
 

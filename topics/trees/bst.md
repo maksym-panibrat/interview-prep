@@ -324,7 +324,7 @@ Inserting an already-sorted sequence into a plain BST degenerates to a linked li
 - [Tree Traversals](traversals.md) — inorder traversal is the backbone of BST sorted-order queries; preorder serialization can reconstruct a BST.
 - [DFS](../graphs/dfs.md) — BST validation, insertion, and deletion are all depth-first recursive traversals with pruning; the same stack-based iterative pattern applies.
 - [Binary Search](../searching-sorting/binary-search.md) — BST search is binary search on an explicit tree shape; the compare-and-halve logic is identical, just navigated via pointers instead of array indices.
-- **Lowest Common Ancestor** (`lca.md`) — LCA algorithms generalize across arbitrary binary trees; in a BST the sorted property gives an O(h) shortcut without post-order annotation.
+- **[Lowest Common Ancestor](lca.md)** — LCA algorithms generalize across arbitrary binary trees; in a BST the sorted property gives an O(h) shortcut without post-order annotation.
 
 ## 9. Interviewer follow-ups
 

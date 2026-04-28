@@ -323,9 +323,9 @@ To find the k-th smallest element without sorting the whole array, reuse the par
 
 ## 8. Related patterns
 
-- **Binary Search** (same folder, `binary-search.md`) — shares the same divide-and-conquer recurrence `T(n) = 2T(n/2) + O(...)`. Mergesort pays O(n) per level (merge cost); binary search pays O(1) per level (single comparison), which is why binary search is O(log n) rather than O(n log n).
-- **Heapsort & Heaps** (will live at `heapsort.md` in this same folder) — another O(n log n) in-place sort; O(1) extra space, not stable, but avoids quicksort's O(n²) worst-case without needing randomization. Also the foundation for priority queues.
-- **Segment Tree & Fenwick Tree** (will live at `../trees/segment-tree-fenwick.md`) — alternative data structures for inversion-count and range-sum problems; where the hard mergesort problems (315, 493) can also be solved by querying a Fenwick tree during a left-to-right scan instead of augmenting the merge step.
+- **[Binary Search](binary-search.md)** — shares the same divide-and-conquer recurrence `T(n) = 2T(n/2) + O(...)`. Mergesort pays O(n) per level (merge cost); binary search pays O(1) per level (single comparison), which is why binary search is O(log n) rather than O(n log n).
+- **[Heapsort & Heaps](heapsort.md)** — another O(n log n) in-place sort; O(1) extra space, not stable, but avoids quicksort's O(n²) worst-case without needing randomization. Also the foundation for priority queues.
+- **[Segment Tree & Fenwick Tree](../trees/segment-tree-fenwick.md)** — alternative data structures for inversion-count and range-sum problems; where the hard mergesort problems (315, 493) can also be solved by querying a Fenwick tree during a left-to-right scan instead of augmenting the merge step.
 
 ## 9. Interviewer follow-ups
 

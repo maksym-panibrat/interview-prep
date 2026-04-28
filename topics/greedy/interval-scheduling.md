@@ -225,7 +225,7 @@ Min arrows (LC 452) is the complement: each arrow bursts all overlapping balloon
 ## 8. Related patterns
 
 - [Segment Tree & Fenwick](../trees/segment-tree-fenwick.md) — alternative for range-add / range-query problems where a sorted sweep is insufficient; use when you need arbitrary range updates, not just point-by-point streaming.
-- **Activity Selection** (`activity-selection.md`) — classical greedy proof for maximum compatible activities; same sort-by-end logic as max non-overlapping, but with an exchange-argument correctness proof.
+- **[Activity Selection](activity-selection.md)** — classical greedy proof for maximum compatible activities; same sort-by-end logic as max non-overlapping, but with an exchange-argument correctness proof.
 
 ## 9. Interviewer follow-ups
 

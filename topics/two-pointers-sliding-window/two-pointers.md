@@ -297,9 +297,9 @@ For k-sum (k ≥ 4), recurse: reduce to (k-1)-sum by fixing the outermost elemen
 
 - **[Binary Search](../searching-sorting/binary-search.md)** — when the array is sorted and you need a single target location, binary search is O(log n); two pointers are O(n) but handle pair/triplet constraints that binary search cannot express in a single query.
 - **[Heapsort & Heaps](../searching-sorting/heapsort.md)** — heaps handle "k-th element" in unsorted data without sorting; two pointers require sorted data but use O(1) space where a heap would need O(k).
-- **Fast/Slow Pointers** — same-direction variant used specifically on linked lists for cycle detection and midpoint-finding. (File at `fast-slow-pointers.md` does not exist yet.)
-- **Sliding Window** — same two-index structure but both pointers move in the same direction and the window expands right before contracting left; the constraint is on the window's contents rather than a pair sum. (File at `sliding-window.md` does not exist yet.)
-- **BST** — for an unsorted collection where the pair-sum problem must be answered online, a BST or hash set gives O(log n) or O(1) lookup per element; the trade-off is O(n) space. (File at `../trees/bst.md` does not exist yet.)
+- **[Fast/Slow Pointers](fast-slow-pointers.md)** — same-direction variant used specifically on linked lists for cycle detection and midpoint-finding.
+- **[Sliding Window](sliding-window.md)** — same two-index structure but both pointers move in the same direction and the window expands right before contracting left; the constraint is on the window's contents rather than a pair sum.
+- **[BST](../trees/bst.md)** — for an unsorted collection where the pair-sum problem must be answered online, a BST or hash set gives O(log n) or O(1) lookup per element; the trade-off is O(n) space.
 
 ## 9. Interviewer follow-ups
 

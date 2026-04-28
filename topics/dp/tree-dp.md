@@ -194,9 +194,10 @@ If the "tree" is actually a DAG (e.g., a dependency graph from topological sort)
 
 ## 8. Related patterns
 
-- **Tree Traversals** — post-order traversal is the execution engine for tree DP; the DP state is simply what each post-order visit returns.
+- **[Tree Traversals](../trees/traversals.md)** — post-order traversal is the execution engine for tree DP; the DP state is simply what each post-order visit returns.
 - [Topological Sort](../graphs/topological-sort.md) — the DAG analog: process nodes in reverse topological order the same way post-order processes tree nodes.
 - [1D DP](1d-dp.md) — the same "summarize subproblem in a small state" principle applied to a linear array instead of a tree.
+- [Bitmask DP](bitmask-dp.md) — when the tree has small branching factor and N ≤ 20, tree DP can combine with bitmask to track subsets at each node.
 
 ## 9. Interviewer follow-ups
 

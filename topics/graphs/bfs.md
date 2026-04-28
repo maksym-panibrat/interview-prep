@@ -331,10 +331,10 @@ Launch BFS simultaneously from both `src` and `dst`. Expand the smaller frontier
 
 ## 8. Related patterns
 
-- **DFS** (file at `dfs.md` — will exist after Task 11): DFS explores as deep as possible before backtracking; use it for connectivity, cycle detection, and problems with a natural recursive structure. BFS is the right choice when you need the shortest path.
-- **Topological Sort** (file at `topological-sort.md` — will exist after Task 12): Kahn's algorithm is BFS on a DAG, peeling nodes with in-degree 0 level by level.
-- **Shortest Paths / Dijkstra** (file at `shortest-paths.md` — will exist after Task 14): Dijkstra = BFS with a min-heap to handle non-uniform edge weights; when all weights are 1, Dijkstra degenerates to BFS.
-- **Bitmask DP**: BFS over bitmask states models TSP-style "visit all nodes" problems (see Shortest Path Visiting All Nodes). File at `../dp/bitmask-dp.md` — does not exist yet.
+- **[DFS](dfs.md)** — DFS explores as deep as possible before backtracking; use it for connectivity, cycle detection, and problems with a natural recursive structure. BFS is the right choice when you need the shortest path.
+- **[Topological Sort](topological-sort.md)** — Kahn's algorithm is BFS on a DAG, peeling nodes with in-degree 0 level by level.
+- **[Shortest Paths / Dijkstra](shortest-paths.md)** — Dijkstra = BFS with a min-heap to handle non-uniform edge weights; when all weights are 1, Dijkstra degenerates to BFS.
+- **[Bitmask DP](../dp/bitmask-dp.md)** — BFS over bitmask states models TSP-style "visit all nodes" problems (see Shortest Path Visiting All Nodes).
 
 ## 9. Interviewer follow-ups
 

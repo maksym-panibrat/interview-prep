@@ -360,7 +360,7 @@ The most common runtime error: calling `fast.next.next` when `fast.next` is `Non
 ## 8. Related patterns
 
 - **[Two Pointers](two-pointers.md)** — fast/slow is a same-direction two-pointer variant; the key difference is that fast moves 2× instead of scanning ahead by value, and the pattern targets linked lists (no random access) rather than sorted arrays.
-- **DFS** — for cycle detection in a **directed graph**, DFS with a "currently in stack" color is the standard approach; fast/slow doesn't generalize to directed graphs with branching. (File at `../graphs/dfs.md` does not exist yet.)
+- **[DFS](../graphs/dfs.md)** — for cycle detection in a **directed graph**, DFS with a "currently in stack" color is the standard approach; fast/slow doesn't generalize to directed graphs with branching.
 
 ## 9. Interviewer follow-ups
 

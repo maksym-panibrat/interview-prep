@@ -256,7 +256,7 @@ For offline "undo last k unions" scenarios, skip path compression (use union by 
 ## 8. Related patterns
 
 - **[DFS](dfs.md)** — DFS and BFS can also find connected components in O(V + E), but they require the full graph in advance. Union-Find shines for online (incremental) edge additions where you need connectivity answers after each addition.
-- **MST** (file at `../nice-to-have/mst.md` — does not exist yet): Kruskal's MST algorithm repeatedly adds the cheapest non-cycle edge; "non-cycle" is tested in O(α(n)) per edge using Union-Find.
+- **[MST](../nice-to-have/mst.md)** — Kruskal's MST algorithm repeatedly adds the cheapest non-cycle edge; "non-cycle" is tested in O(α(n)) per edge using Union-Find.
 - **[Topological Sort](topological-sort.md)** — answers a different DAG question (ordering with dependency constraints); Union-Find answers undirected connectivity questions.
 
 ## 9. Interviewer follow-ups

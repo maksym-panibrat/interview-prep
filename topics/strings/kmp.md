@@ -213,9 +213,9 @@ A string `s` is a repetition `a + a + ...` if and only if `len(s) % (len(s) - lp
 
 ## 8. Related patterns
 
-- **Rabin-Karp** (`rabin-karp.md` — hash-based alternative; wins when matching a set of patterns via hash-set lookup rather than one fixed pattern)
-- **Z-Algorithm** (`../nice-to-have/z-algorithm.md` — often simpler to code for prefix-matching tasks; computes similar information to KMP from a different angle)
-- **Trie** (`trie.md` — Aho-Corasick is multi-pattern KMP built on top of a trie; reach for it when you need to match many patterns simultaneously)
+- **[Rabin-Karp](rabin-karp.md)** — hash-based alternative; wins when matching a set of patterns via hash-set lookup rather than one fixed pattern.
+- **[Z-Algorithm](../nice-to-have/z-algorithm.md)** — often simpler to code for prefix-matching tasks; computes similar information to KMP from a different angle.
+- **[Trie](trie.md)** — Aho-Corasick is multi-pattern KMP built on top of a trie; reach for it when you need to match many patterns simultaneously.
 
 ## 9. Interviewer follow-ups
 

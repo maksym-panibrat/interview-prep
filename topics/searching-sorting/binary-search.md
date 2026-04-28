@@ -267,9 +267,9 @@ The template is `search_on_answer` above. This is one of the highest-leverage pa
 
 ## 8. Related patterns
 
-- **Two Pointers** (will live at `../two-pointers-sliding-window/two-pointers.md`) — a linear-time alternative when the array is not sorted or you need to find pairs; binary search and two pointers both exploit sorted structure but in different ways.
-- **Quicksort & Mergesort** (will live at `quicksort-mergesort.md` in this same folder) — share the same divide-and-conquer recurrence (halving the problem each step); understanding the recurrence deepens intuition for why binary search is O(log n).
-- **Binary Search Tree** (will live at `../trees/bst.md`) — binary search on an explicit tree shape; each comparison at a node mirrors the `mid` comparison in array binary search.
+- **[Two Pointers](../two-pointers-sliding-window/two-pointers.md)** — a linear-time alternative when the array is not sorted or you need to find pairs; binary search and two pointers both exploit sorted structure but in different ways.
+- **[Quicksort & Mergesort](quicksort-mergesort.md)** — share the same divide-and-conquer recurrence (halving the problem each step); understanding the recurrence deepens intuition for why binary search is O(log n).
+- **[Binary Search Tree](../trees/bst.md)** — binary search on an explicit tree shape; each comparison at a node mirrors the `mid` comparison in array binary search.
 
 ## 9. Interviewer follow-ups
 

@@ -211,7 +211,7 @@ Merge chains of single-child nodes into edge labels. Reduces node count from O(t
 
 - [KMP](kmp.md) — Aho-Corasick is multi-pattern KMP built on top of a trie; reach for it when you need to match many patterns simultaneously in a single pass over the text.
 - [DFS](../graphs/dfs.md) — trie traversal (Word Search II, wildcard search) is a DFS over the trie nodes; understanding DFS makes trie-based backtracking natural.
-- **Grid Backtracking** (`../backtracking/grid-search.md` — Word Search II combines board DFS with a trie; grid search provides the outer backtracking framework)
+- **[Grid Backtracking](../backtracking/grid-search.md)** — Word Search II combines board DFS with a trie; grid search provides the outer backtracking framework.
 
 ## 9. Interviewer follow-ups
 

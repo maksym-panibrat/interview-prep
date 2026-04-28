@@ -176,7 +176,7 @@ def factorize(n: int, spf: list[int]) -> dict[int, int]:
 
 - [GCD](gcd.md) — GCD and factorization share the same number-theory setting; LC 952 uses factorization + Union-Find.
 - [Union-Find](../graphs/union-find.md) — LC 952 (Largest Component Size by Common Factor) combines SPF factorization with DSU: union each number to its prime factors and find the largest component.
-- Fast Exponentiation (`fast-exponentiation.md` — does not exist yet) — modular exponentiation underlies Miller-Rabin primality testing and `pow(a, p-2, p)` for modular inverses with prime moduli.
+- **[Fast Exponentiation](fast-exponentiation.md)** — modular exponentiation underlies Miller-Rabin primality testing and `pow(a, p-2, p)` for modular inverses with prime moduli.
 
 ## 9. Interviewer follow-ups
 

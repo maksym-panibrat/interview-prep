@@ -350,9 +350,10 @@ When counting distinct paths or enumerating solutions, DFS on a grid often modif
 ## 8. Related patterns
 
 - **[BFS](bfs.md)** — BFS uses a queue (FIFO) instead of a stack (LIFO) and guarantees shortest-path distance; DFS is better for exhaustive exploration and cycle detection.
-- **Topological Sort** (file at `topological-sort.md` — will exist after Task 12): DFS post-order reversed is a valid topological order for DAGs.
-- **Union-Find** (file at `union-find.md` — will exist after Task 13): an alternative for static connected-component queries; faster per-query amortized, but cannot enumerate the component.
-- **Grid Backtracking** (file at `../backtracking/grid-search.md` — does not exist yet): DFS with mutate-restore on a grid; the explicit backtracking variant of grid DFS.
+- **[Topological Sort](topological-sort.md)** — DFS post-order reversed is a valid topological order for DAGs.
+- **[Union-Find](union-find.md)** — an alternative for static connected-component queries; faster per-query amortized, but cannot enumerate the component.
+- **[Tree Traversals](../trees/traversals.md)** — preorder/inorder/postorder on trees are DFS variants; the iterative DFS template with an explicit stack applies directly.
+- **[Grid Backtracking](../backtracking/grid-search.md)** — DFS with mutate-restore on a grid; the explicit backtracking variant of grid DFS.
 
 ## 9. Interviewer follow-ups
 

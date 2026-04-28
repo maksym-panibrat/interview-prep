@@ -269,7 +269,8 @@ When edge weights are only 0 or 1, replace the heap with a deque: push weight-0 
 
 - **[BFS](bfs.md)** — BFS is Dijkstra with all edge weights equal to 1; the FIFO queue is equivalent to a min-heap when all priorities are identical. For 0/1 weights use 0-1 BFS (deque) instead of a full heap.
 - **[Union-Find](union-find.md)** — answers a different question: "are A and B connected?" without computing distances; Kruskal's MST uses Union-Find alongside edge sorting.
-- **A\*** (file at `../nice-to-have/a-star.md` — does not exist yet): Dijkstra guided by an admissible heuristic; dramatically faster for point-to-point shortest paths in spatial graphs.
+- **[Heapsort & Heaps](../searching-sorting/heapsort.md)** — Dijkstra's priority queue is a min-heap; the merge-k and top-k heap patterns from heapsort are the same data structure.
+- **[A\*](../nice-to-have/a-star.md)** — Dijkstra guided by an admissible heuristic; dramatically faster for point-to-point shortest paths in spatial graphs.
 
 ## 9. Interviewer follow-ups
 

@@ -315,6 +315,8 @@ class SegmentTree:
 - [Lowest Common Ancestor](lca.md) — Euler tour + RMQ (range minimum query) converts LCA to a segment tree problem; the classic O(n log n) preprocessing + O(1) query uses a sparse table over the Euler tour.
 - [Interval DP](../dp/interval-dp.md) — often confused with range trees: interval DP *combines ranges with a cost* to find an optimal substructure, while segment/Fenwick trees *query or update ranges* in a mutable array. Different problems, different tools.
 - [Quicksort & Mergesort](../searching-sorting/quicksort-mergesort.md) — merge sort naturally counts inversions in O(n log n) without any auxiliary structure; when the inversion-count problem allows offline processing or a simple merge, merge sort is lighter than a BIT.
+- [Sliding Window](../two-pointers-sliding-window/sliding-window.md) — for window queries beyond sum/max (e.g., count of range-bounded elements), a Fenwick tree pairs with a sliding window to answer each window's state in O(log n).
+- [Interval Scheduling](../greedy/interval-scheduling.md) — interval sweep problems sometimes require range-update / range-query structures when a sorted sweep is insufficient.
 
 ## 9. Interviewer follow-ups
 

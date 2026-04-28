@@ -327,8 +327,8 @@ Fixed-size window of length `len(p)`. Maintain a character-count delta: decremen
 
 - **[Two Pointers](two-pointers.md)** — sliding window is a two-pointer pattern where both move in the same direction and the window state is tracked between them; two pointers in opposing-pointer mode targets sorted arrays and pair sums rather than substring/subarray properties.
 - **[Fast/Slow Pointers](fast-slow-pointers.md)** — another same-direction two-pointer variant, specialized for linked-list cycle detection; does not maintain window state.
-- **Rabin-Karp / rolling hash** — an alternative for fixed-size window substring matching that replaces the character-count comparison with a hash equality check; O(n) average, O(1) space per window. (File at `../strings/rabin-karp.md` does not exist yet.)
-- **Segment Tree & Fenwick Tree** — for window queries that need more than sum/max (e.g., count of elements in a range), a Fenwick tree supports O(log n) point-update and prefix-sum queries; pairs with a sliding window when the state is a range query. (File at `../trees/segment-tree-fenwick.md` does not exist yet.)
+- **[Rabin-Karp / rolling hash](../strings/rabin-karp.md)** — an alternative for fixed-size window substring matching that replaces the character-count comparison with a hash equality check; O(n) average, O(1) space per window.
+- **[Segment Tree & Fenwick Tree](../trees/segment-tree-fenwick.md)** — for window queries that need more than sum/max (e.g., count of elements in a range), a Fenwick tree supports O(log n) point-update and prefix-sum queries; pairs with a sliding window when the state is a range query.
 
 ## 9. Interviewer follow-ups
 

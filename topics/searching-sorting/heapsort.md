@@ -359,8 +359,8 @@ Split the stream into a lower half (max-heap, negated) and an upper half (min-he
 ## 8. Related patterns
 
 - **[Quicksort & Mergesort](quicksort-mergesort.md)** — both achieve O(n log n) sorting; heapsort shares the time complexity but is in-place and avoids quicksort's O(n²) worst case. Unlike mergesort it's not stable.
-- **Shortest Paths / Dijkstra** — Dijkstra's algorithm uses a min-heap to greedily extract the nearest unvisited node; the heap loop structure is identical to merge-k and top-k patterns. (File at `../graphs/shortest-paths.md` does not exist yet.)
-- **Sliding Window** — fixed-size windows sometimes need an efficient running max/min; a heap with lazy deletion or a monotonic deque are the two options. (File at `../two-pointers-sliding-window/sliding-window.md` does not exist yet.)
+- **[Shortest Paths / Dijkstra](../graphs/shortest-paths.md)** — Dijkstra's algorithm uses a min-heap to greedily extract the nearest unvisited node; the heap loop structure is identical to merge-k and top-k patterns.
+- **[Sliding Window](../two-pointers-sliding-window/sliding-window.md)** — fixed-size windows sometimes need an efficient running max/min; a heap with lazy deletion or a monotonic deque are the two options.
 
 ## 9. Interviewer follow-ups
 

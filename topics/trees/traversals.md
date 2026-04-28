@@ -289,8 +289,8 @@ Level-order BFS with a minor twist: right-side view keeps only the *last* node p
 - [Tree DP](../dp/tree-dp.md) — post-order traversal is the backbone of tree DP; each node combines results from its children.
 - [BFS](../graphs/bfs.md) — level-order traversal is BFS applied to a tree; the same queue-based skeleton applies.
 - [DFS](../graphs/dfs.md) — preorder/inorder/postorder are all DFS variants; the graph DFS template generalizes here.
-- **BST** (`bst.md`) — inorder traversal of a BST yields a sorted sequence; BST operations depend heavily on traversal order.
-- **LCA** (`lca.md`) — lowest-common-ancestor algorithms rely on post-order recursive traversal.
+- **[BST](bst.md)** — inorder traversal of a BST yields a sorted sequence; BST operations depend heavily on traversal order.
+- **[LCA](lca.md)** — lowest-common-ancestor algorithms rely on post-order recursive traversal.
 
 ## 9. Interviewer follow-ups
 

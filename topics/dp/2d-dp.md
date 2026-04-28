@@ -189,8 +189,8 @@ Boolean knapsack: `dp[w]` = True if some subset sums to `w`. Same descending pas
 ## 8. Related patterns
 
 - [1D DP](1d-dp.md) — 1D DP is the foundation; 2D DP adds a second dimension when two inputs interact.
-- **Interval DP** (`interval-dp.md`) — a specialized 2D table where both axes index positions within the *same* sequence and subproblems are intervals; builds on 2D DP ideas.
-- **Bitmask DP** (`bitmask-dp.md`) — encodes subset state as a bitmask integer; can be viewed as a DP over exponentially many "rows."
+- **[Interval DP](interval-dp.md)** — a specialized 2D table where both axes index positions within the *same* sequence and subproblems are intervals; builds on 2D DP ideas.
+- **[Bitmask DP](bitmask-dp.md)** — encodes subset state as a bitmask integer; can be viewed as a DP over exponentially many "rows."
 
 ## 9. Interviewer follow-ups
 

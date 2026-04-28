@@ -192,7 +192,7 @@ Use two independent (base, mod) pairs and only report a match when both hashes a
 
 - [KMP](kmp.md) — deterministic O(n + m) substring search with no false positives; prefer KMP for a single fixed pattern where worst-case guarantees matter.
 - [Sliding Window](../two-pointers-sliding-window/sliding-window.md) — the rolling-hash technique is a special case of the sliding window pattern; the window shrinks and grows by one character at a time.
-- **Z-Algorithm** (`../nice-to-have/z-algorithm.md` — computes prefix-match lengths in O(n) without hashing; often simpler when you need prefix-suffix structure rather than a hash)
+- **[Z-Algorithm](../nice-to-have/z-algorithm.md)** — computes prefix-match lengths in O(n) without hashing; often simpler when you need prefix-suffix structure rather than a hash.
 
 ## 9. Interviewer follow-ups
 

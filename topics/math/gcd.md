@@ -212,8 +212,8 @@ The recursive form is cleaner to derive; the iterative form (tracking two rows o
 ## 8. Related patterns
 
 - [Union-Find](../graphs/union-find.md) — used together in LC 952 (Largest Component Size by Common Factor): factorize each number and union it with its prime factors using DSU.
-- Sieve of Eratosthenes (`sieve.md` — does not exist yet) — factorization needed for LC 952 and other number-theory problems pairs naturally with GCD.
-- Fast Exponentiation (`fast-exponentiation.md` — does not exist yet) — `pow(a, p-2, p)` is the Fermat-based modular inverse; fast exponentiation is the engine that makes it O(log p).
+- **[Sieve of Eratosthenes](sieve.md)** — factorization needed for LC 952 and other number-theory problems pairs naturally with GCD.
+- **[Fast Exponentiation](fast-exponentiation.md)** — `pow(a, p-2, p)` is the Fermat-based modular inverse; fast exponentiation is the engine that makes it O(log p).
 
 ## 9. Interviewer follow-ups
 

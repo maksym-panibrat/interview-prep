@@ -258,7 +258,7 @@ Pre-compute `up[v][k]` = 2^k-th ancestor of node `v` using `up[v][k] = up[up[v][
 - [Tree Traversals](traversals.md) — post-order DFS is the direct backbone of the recursive LCA algorithm; review traversal patterns first.
 - [Binary Search Tree](bst.md) — BST-specific LCA exploits the sorted-order invariant; understanding BST search is a prerequisite.
 - [DFS](../graphs/dfs.md) — the recursive LCA is a specialized DFS; the graph DFS template generalizes to trees naturally.
-- Segment Tree & Fenwick Tree (`segment-tree-fenwick.md` — not yet written) — the Euler tour + RMQ approach reduces LCA to a range-minimum query, which a sparse table or segment tree answers in O(1) or O(log n) respectively.
+- **[Segment Tree & Fenwick Tree](segment-tree-fenwick.md)** — the Euler tour + RMQ approach reduces LCA to a range-minimum query, which a sparse table or segment tree answers in O(1) or O(log n) respectively.
 
 ## 9. Interviewer follow-ups
 

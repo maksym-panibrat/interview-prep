@@ -262,7 +262,7 @@ Process nodes in topological order; for each node u, relax outgoing edges: `dist
 
 - **[BFS](bfs.md)** — Kahn's algorithm is BFS on a DAG, using in-degree as the BFS driver instead of distance.
 - **[DFS](dfs.md)** — DFS post-order reversed is an equivalent topological sort; also needed for the 3-color cycle detection used in `dfs_topo`.
-- **Tree DP** (file at `../dp/tree-dp.md` — does not exist yet): DAG DP often processes nodes in topological order, computing a DP value for each node after all its predecessors are settled.
+- **[Tree DP](../dp/tree-dp.md)** — DAG DP often processes nodes in topological order, computing a DP value for each node after all its predecessors are settled.
 
 ## 9. Interviewer follow-ups
 

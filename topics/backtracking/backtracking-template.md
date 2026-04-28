@@ -278,8 +278,8 @@ Run the combinations template over `[1..9]` with the target-sum base case.
 ## 8. Related patterns
 
 - [Bitmask DP](../dp/bitmask-dp.md) — state-compressed alternative when subsets are the universe and you need the *optimal* result across all subsets rather than enumerating them all.
-- N-Queens & Sudoku (`n-queens-sudoku.md` — not yet written) — backtracking on a 2-D board where constraint-checking (row/column/box conflicts) drives most of the pruning.
-- Grid Backtracking (`grid-search.md` — not yet written) — explores paths on a grid cell by cell; same try/undo skeleton but the "candidates" at each step are the four adjacent cells.
+- **[N-Queens & Sudoku](n-queens-sudoku.md)** — backtracking on a 2-D board where constraint-checking (row/column/box conflicts) drives most of the pruning.
+- **[Grid Backtracking](grid-search.md)** — explores paths on a grid cell by cell; same try/undo skeleton but the "candidates" at each step are the four adjacent cells.
 
 ## 9. Interviewer follow-ups
 
