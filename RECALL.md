@@ -1975,4 +1975,40 @@ def tarjan(n: int, edges: List[Tuple[int, int]]) -> List[List[int]]:
         if disc[v] == -1:
             dfs(v)
     return sccs
+
+## [Boyer-Moore Majority Vote](topics/nice-to-have/boyer-moore.md) ★
+
+Boyer-Moore Majority Vote finds the majority element (appearing > n/2 times) in a single O(n) pass using O(1) space — no hash map, no sorting. The signal is "majority element" with an O(1) extra-space constraint, "streaming counts where you can't store everything," or "voting-style aggregation." Generalized to > n/k: track k-1 candidates. Time: O(n). Space: O(1) (or O(k) for the k-variant).
+
+```python
+def majority_element(nums: list[int]) -> int:
+    candidate, count = nums[0], 0
+    for x in nums:
+        if count == 0:
+            candidate = x
+        count += 1 if x == candidate else -1
+    return candidate
+
+
+def majority_n_div_3(nums: list[int]) -> list[int]:
+    cand1, cand2 = None, None
+    cnt1, cnt2 = 0, 0
+    for x in nums:
+        if x == cand1:
+            cnt1 += 1
+        elif x == cand2:
+            cnt2 += 1
+        elif cnt1 == 0:
+            cand1, cnt1 = x, 1
+        elif cnt2 == 0:
+            cand2, cnt2 = x, 1
+        else:
+            cnt1 -= 1
+            cnt2 -= 1
+    threshold = len(nums) // 3
+    return sorted(
+        c for c in (cand1, cand2)
+        if c is not None and nums.count(c) > threshold
+    )
+```
 ```

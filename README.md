@@ -55,6 +55,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★ [Manacher's Algorithm](topics/nice-to-have/manacher.md)
 1. ★ [Z-Algorithm](topics/nice-to-have/z-algorithm.md)
 1. ★ [Tarjan's & Kosaraju's (SCC)](topics/nice-to-have/tarjan-kosaraju.md)
+1. ★ [Boyer-Moore Majority Vote](topics/nice-to-have/boyer-moore.md)
 
 ## See also
 
