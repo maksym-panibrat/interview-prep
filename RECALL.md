@@ -1407,3 +1407,82 @@ def solve_sudoku(board: List[List[str]]) -> None:
 
     backtrack(0)
 ```
+
+## [Grid Backtracking](topics/backtracking/grid-search.md) ★★
+
+Grid backtracking applies to "find word in grid," "paths with constraints," "visit all cells." Key move: **mutate-restore** — overwrite `board[r][c]='#'` before recursing, restore after. Same skeleton as Backtracking Template; the grid is the implicit decision tree. For many words: trie + DFS (Word Search II), remove trie leaves on match to prune. For shortest path: BFS + separate visited set, not mutate-restore.
+
+```python
+from typing import List
+
+
+def word_search(board: List[List[str]], word: str) -> bool:
+    rows, cols = len(board), len(board[0])
+
+    def dfs(r: int, c: int, idx: int) -> bool:
+        if idx == len(word):
+            return True
+        if r < 0 or r >= rows or c < 0 or c >= cols:
+            return False
+        if board[r][c] != word[idx]:
+            return False
+        tmp, board[r][c] = board[r][c], "#"
+        found = (
+            dfs(r + 1, c, idx + 1) or dfs(r - 1, c, idx + 1)
+            or dfs(r, c + 1, idx + 1) or dfs(r, c - 1, idx + 1)
+        )
+        board[r][c] = tmp
+        return found
+
+    for r in range(rows):
+        for c in range(cols):
+            if dfs(r, c, 0):
+                return True
+    return False
+
+
+class _TrieNode:
+    __slots__ = ("children", "word")
+
+    def __init__(self) -> None:
+        self.children: dict = {}
+        self.word = None
+
+
+def word_search_ii(board: List[List[str]], words: List[str]) -> List[str]:
+    root = _TrieNode()
+    for w in words:
+        node = root
+        for ch in w:
+            if ch not in node.children:
+                node.children[ch] = _TrieNode()
+            node = node.children[ch]
+        node.word = w
+
+    rows, cols = len(board), len(board[0])
+    found: List[str] = []
+
+    def dfs(r: int, c: int, node: _TrieNode) -> None:
+        if r < 0 or r >= rows or c < 0 or c >= cols:
+            return
+        ch = board[r][c]
+        if ch == "#" or ch not in node.children:
+            return
+        child = node.children[ch]
+        if child.word is not None:
+            found.append(child.word)
+            child.word = None
+        board[r][c] = "#"
+        dfs(r + 1, c, child)
+        dfs(r - 1, c, child)
+        dfs(r, c + 1, child)
+        dfs(r, c - 1, child)
+        board[r][c] = ch
+        if not child.children and child.word is None:
+            del node.children[ch]
+
+    for r in range(rows):
+        for c in range(cols):
+            dfs(r, c, root)
+    return found
+```

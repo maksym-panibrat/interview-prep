@@ -44,6 +44,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [Activity Selection (and Huffman name-drop)](topics/greedy/activity-selection.md)
 1. ★★ [Backtracking Template](topics/backtracking/backtracking-template.md)
 1. ★★ [N-Queens & Sudoku](topics/backtracking/n-queens-sudoku.md)
+1. ★★ [Grid Backtracking](topics/backtracking/grid-search.md)
 
 ## See also
 
