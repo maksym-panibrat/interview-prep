@@ -18,3 +18,5 @@ For full context on any template, see the corresponding topic file under [`../to
 - [`dijkstra.py`](dijkstra.py) — dijkstra, dijkstra_with_path
 - [`kmp.py`](kmp.py) — compute_lps, kmp_search
 - [`trie.py`](trie.py) — Trie (dict-of-dicts), TrieArray (26-element children)
+- [`segment-tree.py`](segment-tree.py) — point update, range sum (extensible to lazy)
+- [`fenwick-tree.py`](fenwick-tree.py) — point update, prefix sum

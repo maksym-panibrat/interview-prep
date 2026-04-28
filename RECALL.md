@@ -1113,3 +1113,72 @@ def lca_bst(root: Optional[TreeNode],
             return node
     return None
 ```
+
+## [Segment Tree & Fenwick](topics/trees/segment-tree-fenwick.md) ★★
+
+Reach for these structures when a problem asks for **range queries with point updates** (or range updates with point queries): "sum/min/max over [l, r]" combined with mutations. The signal is "mutable prefix sum," "counting inversions," or "sum/min/max over a changing array." Fenwick (Binary Indexed Tree, BIT) is the compact O(log n) choice for prefix-sum, count, or XOR workloads; segment tree is the general-purpose choice supporting any associative merge operation plus lazy propagation for range updates. Both build in O(n) and answer queries in O(log n).
+
+```python
+class Fenwick:
+    def __init__(self, n):
+        self.n = n
+        self.tree = [0] * (n + 1)
+
+    def update(self, i, delta):
+        while i <= self.n:
+            self.tree[i] += delta
+            i += i & -i
+
+    def prefix_sum(self, i):
+        s = 0
+        while i > 0:
+            s += self.tree[i]
+            i -= i & -i
+        return s
+
+    def range_sum(self, l, r):
+        return self.prefix_sum(r) - self.prefix_sum(l - 1)
+
+
+class SegmentTree:
+    def __init__(self, data):
+        self.n = len(data)
+        self.tree = [0] * (4 * self.n)
+        if self.n:
+            self._build(1, 0, self.n - 1, data)
+
+    def _build(self, node, node_l, node_r, data):
+        if node_l == node_r:
+            self.tree[node] = data[node_l]
+            return
+        mid = (node_l + node_r) // 2
+        self._build(2 * node, node_l, mid, data)
+        self._build(2 * node + 1, mid + 1, node_r, data)
+        self.tree[node] = self.tree[2 * node] + self.tree[2 * node + 1]
+
+    def update(self, i, val):
+        self._update(1, 0, self.n - 1, i, val)
+
+    def _update(self, node, node_l, node_r, i, val):
+        if node_l == node_r:
+            self.tree[node] = val
+            return
+        mid = (node_l + node_r) // 2
+        if i <= mid:
+            self._update(2 * node, node_l, mid, i, val)
+        else:
+            self._update(2 * node + 1, mid + 1, node_r, i, val)
+        self.tree[node] = self.tree[2 * node] + self.tree[2 * node + 1]
+
+    def query(self, l, r):
+        return self._query(1, 0, self.n - 1, l, r)
+
+    def _query(self, node, node_l, node_r, l, r):
+        if r < node_l or node_r < l:
+            return 0
+        if l <= node_l and node_r <= r:
+            return self.tree[node]
+        mid = (node_l + node_r) // 2
+        return (self._query(2 * node, node_l, mid, l, r) +
+                self._query(2 * node + 1, mid + 1, node_r, l, r))
+```
