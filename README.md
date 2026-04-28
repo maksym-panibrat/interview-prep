@@ -22,6 +22,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★★ [Heapsort & Heaps](topics/searching-sorting/heapsort.md)
 1. ★★★ [Two Pointers](topics/two-pointers-sliding-window/two-pointers.md)
 1. ★★★ [Fast/Slow Pointers](topics/two-pointers-sliding-window/fast-slow-pointers.md)
+1. ★★★ [Sliding Window](topics/two-pointers-sliding-window/sliding-window.md)
 
 ## See also
 
