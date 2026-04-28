@@ -58,3 +58,70 @@ def search_on_answer(lo: int, hi: int, feasible: Callable[[int], bool]) -> int:
             lo = mid + 1
     return lo
 ```
+
+## [Quicksort & Mergesort](topics/searching-sorting/quicksort-mergesort.md) ★★★
+
+Both algorithms sort in O(n log n) average time using divide-and-conquer: split the problem in half, recurse, combine. The signal is "implement sort," "sort with constraints (in-place, stable, k-th element)," or "describe how your sort works." Use **mergesort** when you need stability, predictable worst-case O(n log n), or are sorting a linked list; use **quicksort** when you need in-place sort with good cache behavior and can tolerate O(n²) worst-case (mitigate with randomized pivot). Time: O(n log n) average. Space: O(n) mergesort, O(log n) quicksort (recursion stack).
+
+```python
+import random
+from typing import List
+
+
+def merge(a: List[int], b: List[int]) -> List[int]:
+    result: List[int] = []
+    i = j = 0
+    while i < len(a) and j < len(b):
+        if a[i] <= b[j]:
+            result.append(a[i])
+            i += 1
+        else:
+            result.append(b[j])
+            j += 1
+    result.extend(a[i:])
+    result.extend(b[j:])
+    return result
+
+
+def mergesort(nums: List[int]) -> List[int]:
+    if len(nums) <= 1:
+        return list(nums)
+    mid = len(nums) // 2
+    return merge(mergesort(nums[:mid]), mergesort(nums[mid:]))
+
+
+def _lomuto_partition(nums: List[int], lo: int, hi: int) -> int:
+    pivot_idx = random.randrange(lo, hi + 1)
+    nums[pivot_idx], nums[hi] = nums[hi], nums[pivot_idx]
+    pivot = nums[hi]
+    i = lo - 1
+    for j in range(lo, hi):
+        if nums[j] <= pivot:
+            i += 1
+            nums[i], nums[j] = nums[j], nums[i]
+    nums[i + 1], nums[hi] = nums[hi], nums[i + 1]
+    return i + 1
+
+
+def quicksort(nums: List[int]) -> None:
+    def _qs(lo: int, hi: int) -> None:
+        if lo < hi:
+            p = _lomuto_partition(nums, lo, hi)
+            _qs(lo, p - 1)
+            _qs(p + 1, hi)
+    if len(nums) > 1:
+        _qs(0, len(nums) - 1)
+
+
+def quickselect(nums: List[int], k: int) -> int:
+    lo, hi, target = 0, len(nums) - 1, k - 1
+    while lo < hi:
+        p = _lomuto_partition(nums, lo, hi)
+        if p == target:
+            return nums[p]
+        elif p < target:
+            lo = p + 1
+        else:
+            hi = p - 1
+    return nums[lo]
+```
