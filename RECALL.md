@@ -1660,3 +1660,60 @@ def astar(
                 heapq.heappush(heap, (ng + heuristic(nb), counter, nb))
     return None
 ```
+
+## [Minimum Spanning Tree](topics/nice-to-have/mst.md) ★
+
+A Minimum Spanning Tree (MST) connects all nodes in a weighted undirected graph with the minimum total edge weight, using exactly V−1 edges. Signal: "minimum cost to connect all nodes," "connect all cities with minimum cable," or any problem that asks you to wire up a network cheaply. Two classic algorithms: **Kruskal** (sort edges, union-find) and **Prim** (grow from a root with a min-heap). Kruskal: O(E log E). Prim with heap: O((V + E) log V).
+
+```python
+import heapq
+from typing import List, Tuple
+
+
+def kruskal(n: int, edges: List[Tuple[int, int, int]]) -> Tuple[int, List]:
+    parent = list(range(n))
+    rank = [0] * n
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(x: int, y: int) -> bool:
+        rx, ry = find(x), find(y)
+        if rx == ry:
+            return False
+        if rank[rx] < rank[ry]:
+            rx, ry = ry, rx
+        parent[ry] = rx
+        if rank[rx] == rank[ry]:
+            rank[rx] += 1
+        return True
+
+    total_cost = 0
+    mst_edges: List[Tuple[int, int, int]] = []
+    for u, v, w in sorted(edges, key=lambda e: e[2]):
+        if union(u, v):
+            total_cost += w
+            mst_edges.append((u, v, w))
+            if len(mst_edges) == n - 1:
+                break
+    return total_cost, mst_edges
+
+
+def prim(n: int, adj: List[List[Tuple[int, int]]]) -> int:
+    in_tree = [False] * n
+    heap: List[Tuple[int, int]] = [(0, 0)]
+    total_cost = 0
+    while heap:
+        cost, u = heapq.heappop(heap)
+        if in_tree[u]:
+            continue
+        in_tree[u] = True
+        total_cost += cost
+        for v, w in adj[u]:
+            if not in_tree[v]:
+                heapq.heappush(heap, (w, v))
+    return total_cost
+```
