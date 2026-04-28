@@ -742,3 +742,36 @@ def interval_dp(arr: List[int]) -> int:
 
     return dp[0][n - 1]
 ```
+
+## [Tree DP](topics/dp/tree-dp.md) ★★★
+
+Tree DP applies when the answer at each node depends on its children's answers — "max path through a tree," "minimum cameras to cover all nodes," "rob a tree of houses." The signal is that the problem is defined on a tree and optimal choices interact through parent-child relationships. Post-order DFS naturally computes all children before the parent; each node returns a small state tuple summarizing its subtree. Time: O(n). Space: O(n) (recursion stack).
+
+```python
+from typing import Optional, Tuple
+
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+
+def tree_dp(root: Optional[TreeNode]):
+    def dfs(node: Optional[TreeNode]) -> Tuple:
+        if node is None:
+            return (0, 0)                    # base case — adjust tuple size as needed
+
+        left_state = dfs(node.left)
+        right_state = dfs(node.right)
+
+        # Combine left_state, right_state, and node.val into this node's state
+        state_a = node.val + left_state[1] + right_state[1]   # "take" branch
+        state_b = max(left_state) + max(right_state)           # "skip" branch
+
+        return (state_a, state_b)
+
+    result = dfs(root)
+    return max(result)
+```
