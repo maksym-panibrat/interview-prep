@@ -40,6 +40,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [Binary Search Tree](topics/trees/bst.md)
 1. ★★ [Lowest Common Ancestor](topics/trees/lca.md)
 1. ★★ [Segment Tree & Fenwick](topics/trees/segment-tree-fenwick.md)
+1. ★★ [Interval Scheduling](topics/greedy/interval-scheduling.md)
 
 ## See also
 

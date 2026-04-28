@@ -73,9 +73,9 @@ This is the canonical 8-step checklist applied to **every task in Phases 3–5**
 
 - [ ] **Step 5: Append entry to `README.md` study order**, format:
   ```markdown
-  - <TIER_STARS> [<TOPIC_TITLE>](<TOPIC_FILE>)
+  1. <TIER_STARS> [<TOPIC_TITLE>](<TOPIC_FILE>)
   ```
-  Final canonical ordering happens in Task 44; for now just append.
+  Use `1.` for every entry — markdown auto-numbers sequential `1.` items, and Task 44 produces the canonical fixed-number ordering. Do NOT use `-` bullets here; the spec's study order is a numbered list.
 
 - [ ] **Step 6 (only if `<TEMPLATE_FILE>` is set in the task): Create the templates file**
 

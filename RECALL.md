@@ -1182,3 +1182,48 @@ class SegmentTree:
         return (self._query(2 * node, node_l, mid, l, r) +
                 self._query(2 * node + 1, mid + 1, node_r, l, r))
 ```
+
+## [Interval Scheduling](topics/greedy/interval-scheduling.md) ★★
+
+Interval scheduling problems place intervals on a number line and ask you to merge overlapping ones, find the minimum number of non-overlapping groups (rooms/machines), or select the maximum non-overlapping subset. The signal is "merge / insert / count overlaps," "minimum rooms," or "max non-overlapping." Sort by the right endpoint for maximum non-overlapping selection; sort by start for merge/insert; use an event sweep (+1 on start, -1 on end) for minimum rooms. Time: O(n log n) sort + O(n) sweep.
+
+```python
+from typing import List
+
+
+def merge_intervals(intervals: List[List[int]]) -> List[List[int]]:
+    if not intervals:
+        return []
+    intervals = sorted(intervals, key=lambda x: x[0])
+    result = [intervals[0][:]]
+    for start, end in intervals[1:]:
+        if start <= result[-1][1]:
+            result[-1][1] = max(result[-1][1], end)
+        else:
+            result.append([start, end])
+    return result
+
+
+def min_rooms(intervals: List[List[int]]) -> int:
+    events = []
+    for s, e in intervals:
+        events.append((s, 1))
+        events.append((e, -1))
+    events.sort(key=lambda x: (x[0], x[1]))
+    cur = best = 0
+    for _, d in events:
+        cur += d
+        best = max(best, cur)
+    return best
+
+
+def max_non_overlapping(intervals: List[List[int]]) -> int:
+    sorted_ivs = sorted(intervals, key=lambda x: x[1])
+    count = 0
+    last_end = float("-inf")
+    for start, end in sorted_ivs:
+        if start >= last_end:
+            count += 1
+            last_end = end
+    return count
+```
