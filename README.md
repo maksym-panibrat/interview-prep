@@ -47,6 +47,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [Grid Backtracking](topics/backtracking/grid-search.md)
 1. ★★ [GCD](topics/math/gcd.md)
 1. ★★ [Sieve of Eratosthenes](topics/math/sieve.md)
+1. ★★ [Fast Exponentiation](topics/math/fast-exponentiation.md)
 
 ## See also
 

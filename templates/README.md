@@ -22,3 +22,4 @@ For full context on any template, see the corresponding topic file under [`../to
 - [`fenwick-tree.py`](fenwick-tree.py) — point update, prefix sum
 - [`backtracking.py`](backtracking.py) — subsets, permutations, combinations, combination_sum
 - [`sieve.py`](sieve.py) — sieve (primes up to n), smallest_prime_factor (SPF table)
+- [`fast-exponentiation.py`](fast-exponentiation.py) — pow_int, pow_mod, mat_mult, mat_pow
