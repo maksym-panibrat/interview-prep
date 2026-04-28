@@ -50,6 +50,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [Fast Exponentiation](topics/math/fast-exponentiation.md)
 1. ★ [A* Search](topics/nice-to-have/a-star.md)
 1. ★ [Minimum Spanning Tree](topics/nice-to-have/mst.md)
+1. ★ [Max Flow / Min Cut](topics/nice-to-have/max-flow.md)
 
 ## See also
 

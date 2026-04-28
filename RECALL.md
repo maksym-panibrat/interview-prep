@@ -1717,3 +1717,63 @@ def prim(n: int, adj: List[List[Tuple[int, int]]]) -> int:
                 heapq.heappush(heap, (w, v))
     return total_cost
 ```
+
+## [Max Flow / Min Cut](topics/nice-to-have/max-flow.md) ★
+
+Max Flow finds the maximum amount of flow that can be sent from a **source** to a **sink** in a capacity-constrained network. The signal is "maximum bipartite matching," "maximum throughput in a network," or any min-cut equivalence problem. Key theorem: **max flow = min cut** (Ford-Fulkerson duality). Edmonds-Karp (BFS-based): O(VE²). Dinic's: O(V²E); O(E√V) for unit-capacity bipartite.
+
+```python
+from collections import deque
+from typing import List, Optional
+
+
+class FlowNetwork:
+    def __init__(self, n: int) -> None:
+        self.n = n
+        self.graph: List[List[List[int]]] = [[] for _ in range(n)]
+
+    def add_edge(self, u: int, v: int, cap: int) -> None:
+        self.graph[u].append([v, cap, len(self.graph[v])])
+        self.graph[v].append([u, 0, len(self.graph[u]) - 1])
+
+    def bfs_augmenting_path(self, s: int, t: int) -> Optional[List[int]]:
+        parent = [-1] * self.n
+        parent[s] = s
+        queue: deque[int] = deque([s])
+        while queue:
+            u = queue.popleft()
+            for v, cap, _ in self.graph[u]:
+                if cap > 0 and parent[v] == -1:
+                    parent[v] = u
+                    if v == t:
+                        return parent
+                    queue.append(v)
+        return None
+
+    def max_flow(self, s: int, t: int) -> int:
+        flow = 0
+        while True:
+            parent = self.bfs_augmenting_path(s, t)
+            if parent is None:
+                break
+            path_flow = float("inf")
+            v = t
+            while v != s:
+                u = parent[v]
+                for edge in self.graph[u]:
+                    if edge[0] == v and edge[1] > 0:
+                        path_flow = min(path_flow, edge[1])
+                        break
+                v = u
+            v = t
+            while v != s:
+                u = parent[v]
+                for edge in self.graph[u]:
+                    if edge[0] == v and edge[1] > 0:
+                        edge[1] -= path_flow
+                        self.graph[v][edge[2]][1] += path_flow
+                        break
+                v = u
+            flow += path_flow
+        return flow
+```
