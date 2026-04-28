@@ -41,6 +41,7 @@ def test_passes_when_all_sections_present(tmp_path):
         """)
     result = _run(tmp_path, md)
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "OK" in result.stdout
 
 
 def test_fails_when_section_missing(tmp_path):

@@ -32,8 +32,8 @@ REQUIRED_SECTIONS = [
     "Interviewer follow-ups",
 ]
 
-PYTHON_BLOCK_RE = re.compile(r"```python\n(.*?)```", re.DOTALL)
-LINK_RE = re.compile(r"\]\(([^)]+)\)")
+PYTHON_BLOCK_RE = re.compile(r"```python[^\n]*\n(.*?)```", re.DOTALL)
+LINK_RE = re.compile(r"(?<!!)\]\(([^)]+)\)")
 
 
 def check_sections(text: str) -> list[str]:
@@ -72,7 +72,7 @@ def check_links(path: Path, text: str) -> list[str]:
 
 
 def verify_file(path: Path) -> list[str]:
-    text = path.read_text()
+    text = path.read_text(encoding="utf-8")
     errors = []
     errors.extend(check_sections(text))
     errors.extend(check_python_blocks(text))
