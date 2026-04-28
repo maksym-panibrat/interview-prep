@@ -20,3 +20,4 @@ For full context on any template, see the corresponding topic file under [`../to
 - [`trie.py`](trie.py) — Trie (dict-of-dicts), TrieArray (26-element children)
 - [`segment-tree.py`](segment-tree.py) — point update, range sum (extensible to lazy)
 - [`fenwick-tree.py`](fenwick-tree.py) — point update, prefix sum
+- [`backtracking.py`](backtracking.py) — subsets, permutations, combinations, combination_sum

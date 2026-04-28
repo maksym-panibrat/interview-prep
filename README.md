@@ -42,6 +42,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★ [Segment Tree & Fenwick](topics/trees/segment-tree-fenwick.md)
 1. ★★ [Interval Scheduling](topics/greedy/interval-scheduling.md)
 1. ★★ [Activity Selection (and Huffman name-drop)](topics/greedy/activity-selection.md)
+1. ★★ [Backtracking Template](topics/backtracking/backtracking-template.md)
 
 ## See also
 
