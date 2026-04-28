@@ -15,3 +15,4 @@ For full context on any template, see the corresponding topic file under [`../to
 - [`dfs.py`](dfs.py) — dfs_recursive, dfs_iterative, has_cycle_directed, connected_components
 - [`topological-sort.py`](topological-sort.py) — kahn, dfs_topo
 - [`union-find.py`](union-find.py) — UnionFind class (find, union, connected, component_size)
+- [`dijkstra.py`](dijkstra.py) — dijkstra, dijkstra_with_path

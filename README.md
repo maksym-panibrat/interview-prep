@@ -27,6 +27,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★★ [DFS](topics/graphs/dfs.md)
 1. ★★★ [Topological Sort](topics/graphs/topological-sort.md)
 1. ★★★ [Union-Find](topics/graphs/union-find.md)
+1. ★★★ [Shortest Paths (Dijkstra)](topics/graphs/shortest-paths.md)
 
 ## See also
 

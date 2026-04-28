@@ -242,6 +242,59 @@ class UnionFind:
         return self.size[self.find(x)]
 ```
 
+## [Shortest Paths (Dijkstra)](topics/graphs/shortest-paths.md) ★★★
+
+Dijkstra's algorithm finds the shortest path from a source to all other nodes in a **weighted graph with non-negative edge weights**. The signal is "shortest path with weights," "minimum cost to traverse," or any weighted-graph distance question where edges are non-negative. A min-heap processes the closest unsettled node first; each node is settled at most once, giving O((V + E) log V) with a binary heap. For negative edges use **Bellman-Ford** (O(VE)); for all-pairs distances on small dense graphs use **Floyd-Warshall** (O(V³)). Space: O(V + E).
+
+```python
+import heapq
+from typing import Dict, List, Optional, Tuple
+
+
+def dijkstra(graph: Dict[int, List[Tuple[int, int]]], src: int) -> Dict[int, float]:
+    dist: Dict[int, float] = {src: 0.0}
+    heap: List[Tuple[float, int]] = [(0.0, src)]
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d > dist.get(u, float("inf")):
+            continue
+        for v, w in graph.get(u, []):
+            nd = d + w
+            if nd < dist.get(v, float("inf")):
+                dist[v] = nd
+                heapq.heappush(heap, (nd, v))
+    return dist
+
+
+def dijkstra_with_path(
+    graph: Dict[int, List[Tuple[int, int]]], src: int, dst: int
+) -> Tuple[float, Optional[List[int]]]:
+    dist: Dict[int, float] = {src: 0.0}
+    prev: Dict[int, Optional[int]] = {src: None}
+    heap: List[Tuple[float, int]] = [(0.0, src)]
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d > dist.get(u, float("inf")):
+            continue
+        if u == dst:
+            break
+        for v, w in graph.get(u, []):
+            nd = d + w
+            if nd < dist.get(v, float("inf")):
+                dist[v] = nd
+                prev[v] = u
+                heapq.heappush(heap, (nd, v))
+    if dst not in dist:
+        return (float("inf"), None)
+    path: List[int] = []
+    node: Optional[int] = dst
+    while node is not None:
+        path.append(node)
+        node = prev.get(node)
+    path.reverse()
+    return (dist[dst], path)
+```
+
 ## [Binary Search](topics/searching-sorting/binary-search.md) ★★★
 
 Binary search applies whenever you have a **sorted array** (or any monotonic predicate over an integer or real range): either to locate a target in O(log n), or to find the smallest/largest value satisfying some condition. The signal is "sorted input", "O(log n) required", or a feasibility check that flips from False to True exactly once as you move across a range. Time: O(log n). Space: O(1).
