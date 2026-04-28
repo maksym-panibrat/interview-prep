@@ -6,295 +6,6 @@ For full explanations, walkthroughs, and problem sets, follow the link on each t
 
 <!-- card sections appended by per-topic tasks -->
 
-## [BFS](topics/graphs/bfs.md) ★★★
-
-BFS (Breadth-First Search) is the go-to algorithm for **shortest path in an unweighted graph**, level-order traversal, and "minimum steps to reach a state" problems. The signal is "shortest path," "minimum steps/moves," "level-order," grid problems where each cell-to-cell move costs 1, or state-space problems like word ladder and open-the-lock. Key property: FIFO queue ensures the first time you reach a node, you've taken the fewest edges. Time: O(V + E). Space: O(V).
-
-```python
-from collections import deque
-from typing import Dict, List, Set, Tuple
-
-
-def bfs_shortest_path(graph: Dict[int, List[int]], src: int, dst: int) -> int:
-    if src == dst:
-        return 0
-    visited: Set[int] = {src}
-    queue: deque = deque([(src, 0)])
-    while queue:
-        node, dist = queue.popleft()
-        for nb in graph.get(node, []):
-            if nb == dst:
-                return dist + 1
-            if nb not in visited:
-                visited.add(nb)
-                queue.append((nb, dist + 1))
-    return -1
-
-
-def bfs_grid(grid: List[List[int]], sources: List[Tuple[int, int]]) -> List[List[int]]:
-    rows, cols = len(grid), len(grid[0])
-    dist = [[float("inf")] * cols for _ in range(rows)]
-    queue: deque = deque()
-    for r, c in sources:
-        dist[r][c] = 0
-        queue.append((r, c))
-    dirs = [(0, 1), (0, -1), (1, 0), (-1, 0)]
-    while queue:
-        r, c = queue.popleft()
-        for dr, dc in dirs:
-            nr, nc = r + dr, c + dc
-            if 0 <= nr < rows and 0 <= nc < cols and dist[nr][nc] == float("inf"):
-                dist[nr][nc] = dist[r][c] + 1
-                queue.append((nr, nc))
-    return [[int(d) if d != float("inf") else -1 for d in row] for row in dist]
-
-
-def bidirectional_bfs(graph: Dict[int, List[int]], src: int, dst: int) -> int:
-    if src == dst:
-        return 0
-    front, back = {src}, {dst}
-    vf, vb = {src: 0}, {dst: 0}
-    d = 0
-    while front and back:
-        d += 1
-        if len(front) > len(back):
-            front, back, vf, vb = back, front, vb, vf
-        nxt: Set[int] = set()
-        for node in front:
-            for nb in graph.get(node, []):
-                if nb in vb:
-                    return d + vb[nb]
-                if nb not in vf:
-                    vf[nb] = d
-                    nxt.add(nb)
-        front = nxt
-    return -1
-```
-
-## [DFS](topics/graphs/dfs.md) ★★★
-
-DFS (Depth-First Search) is the workhorse for **connected components**, **cycle detection**, **path enumeration**, and any problem with a natural recursive decomposition on a graph. The signal is "connected components," "find all paths," "detect cycle," "explore everything reachable," or problems where the problem tree mirrors the call stack. Key insight: stack-based exploration goes as deep as possible before backtracking; post-order discovery (finish time) is the reverse of topological order. Time: O(V + E). Space: O(V) for the recursion stack.
-
-```python
-import sys
-from typing import Dict, List, Optional, Set
-
-
-def dfs_recursive(graph: Dict[int, List[int]], start: int, visited: Optional[Set[int]] = None) -> List[int]:
-    if visited is None:
-        visited = set()
-    visited.add(start)
-    order = [start]
-    for nb in graph.get(start, []):
-        if nb not in visited:
-            order.extend(dfs_recursive(graph, nb, visited))
-    return order
-
-
-def dfs_iterative(graph: Dict[int, List[int]], start: int) -> List[int]:
-    visited: Set[int] = set()
-    stack = [start]
-    order: List[int] = []
-    while stack:
-        node = stack.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-        order.append(node)
-        for nb in reversed(graph.get(node, [])):
-            if nb not in visited:
-                stack.append(nb)
-    return order
-
-
-def has_cycle_directed(graph: Dict[int, List[int]]) -> bool:
-    WHITE, GRAY, BLACK = 0, 1, 2
-    color: Dict[int, int] = {}
-    for u in graph:
-        color[u] = WHITE
-        for v in graph[u]:
-            if v not in color:
-                color[v] = WHITE
-
-    def dfs(u: int) -> bool:
-        color[u] = GRAY
-        for v in graph.get(u, []):
-            if color[v] == GRAY:
-                return True
-            if color[v] == WHITE and dfs(v):
-                return True
-        color[u] = BLACK
-        return False
-
-    return any(dfs(n) for n in list(color) if color[n] == WHITE)
-
-
-def connected_components(graph: Dict[int, List[int]]) -> List[List[int]]:
-    visited: Set[int] = set()
-    components: List[List[int]] = []
-    all_nodes: Set[int] = set(graph.keys())
-    for nbs in graph.values():
-        all_nodes.update(nbs)
-    for node in sorted(all_nodes):
-        if node not in visited:
-            comp: List[int] = []
-            stack = [node]
-            while stack:
-                u = stack.pop()
-                if u in visited:
-                    continue
-                visited.add(u)
-                comp.append(u)
-                for v in graph.get(u, []):
-                    if v not in visited:
-                        stack.append(v)
-            components.append(sorted(comp))
-    return components
-```
-
-## [Topological Sort](topics/graphs/topological-sort.md) ★★★
-
-Topological sort orders the nodes of a **DAG** (directed acyclic graph) so that every directed edge `u → v` has `u` appearing before `v`. The signal is "build order," "course prerequisites," "task scheduling with constraints," "compile order," or any problem that requires respecting dependency chains. Two equivalent algorithms: **Kahn's** (BFS-based, peels in-degree-0 nodes level by level) and **DFS-based** (post-order reversed). Kahn's naturally detects cycles; DFS-based is cleaner if you already have DFS set up. Time: O(V + E). Space: O(V).
-
-```python
-from collections import deque
-from typing import Dict, List, Optional
-
-
-def kahn(graph: Dict[int, List[int]], n: int) -> Optional[List[int]]:
-    in_degree = [0] * n
-    for u in range(n):
-        for v in graph.get(u, []):
-            in_degree[v] += 1
-    queue: deque = deque(i for i in range(n) if in_degree[i] == 0)
-    result: List[int] = []
-    while queue:
-        u = queue.popleft()
-        result.append(u)
-        for v in graph.get(u, []):
-            in_degree[v] -= 1
-            if in_degree[v] == 0:
-                queue.append(v)
-    return result if len(result) == n else None
-
-
-def dfs_topo(graph: Dict[int, List[int]], n: int) -> Optional[List[int]]:
-    WHITE, GRAY, BLACK = 0, 1, 2
-    color = [WHITE] * n
-    result: List[int] = []
-
-    def dfs(u: int) -> bool:
-        color[u] = GRAY
-        for v in graph.get(u, []):
-            if color[v] == GRAY:
-                return True
-            if color[v] == WHITE and dfs(v):
-                return True
-        color[u] = BLACK
-        result.append(u)
-        return False
-
-    for i in range(n):
-        if color[i] == WHITE:
-            if dfs(i):
-                return None
-    result.reverse()
-    return result
-```
-
-## [Union-Find](topics/graphs/union-find.md) ★★★
-
-Union-Find (Disjoint Set Union, DSU) answers "are A and B in the same connected component?" and "merge two components" in nearly O(1) amortized time per operation. The signal is **incremental connectivity**: edges arrive one by one and you need to query or track connected components after each addition. Classic applications include Kruskal's MST, "number of connected components after online edge insertions," equivalence classes, and redundant connections. Time: O(α(n)) amortized per operation (inverse Ackermann — effectively constant for any practical n). Space: O(n).
-
-```python
-from typing import List
-
-
-class UnionFind:
-    def __init__(self, n: int) -> None:
-        self.parent: List[int] = list(range(n))
-        self.rank: List[int] = [0] * n
-        self.size: List[int] = [1] * n
-        self.num_components: int = n
-
-    def find(self, x: int) -> int:
-        if self.parent[x] != x:
-            self.parent[x] = self.find(self.parent[x])
-        return self.parent[x]
-
-    def union(self, x: int, y: int) -> bool:
-        rx, ry = self.find(x), self.find(y)
-        if rx == ry:
-            return False
-        if self.rank[rx] < self.rank[ry]:
-            rx, ry = ry, rx
-        self.parent[ry] = rx
-        self.size[rx] += self.size[ry]
-        if self.rank[rx] == self.rank[ry]:
-            self.rank[rx] += 1
-        self.num_components -= 1
-        return True
-
-    def connected(self, x: int, y: int) -> bool:
-        return self.find(x) == self.find(y)
-
-    def component_size(self, x: int) -> int:
-        return self.size[self.find(x)]
-```
-
-## [Shortest Paths (Dijkstra)](topics/graphs/shortest-paths.md) ★★★
-
-Dijkstra's algorithm finds the shortest path from a source to all other nodes in a **weighted graph with non-negative edge weights**. The signal is "shortest path with weights," "minimum cost to traverse," or any weighted-graph distance question where edges are non-negative. A min-heap processes the closest unsettled node first; each node is settled at most once, giving O((V + E) log V) with a binary heap. For negative edges use **Bellman-Ford** (O(VE)); for all-pairs distances on small dense graphs use **Floyd-Warshall** (O(V³)). Space: O(V + E).
-
-```python
-import heapq
-from typing import Dict, List, Optional, Tuple
-
-
-def dijkstra(graph: Dict[int, List[Tuple[int, int]]], src: int) -> Dict[int, float]:
-    dist: Dict[int, float] = {src: 0.0}
-    heap: List[Tuple[float, int]] = [(0.0, src)]
-    while heap:
-        d, u = heapq.heappop(heap)
-        if d > dist.get(u, float("inf")):
-            continue
-        for v, w in graph.get(u, []):
-            nd = d + w
-            if nd < dist.get(v, float("inf")):
-                dist[v] = nd
-                heapq.heappush(heap, (nd, v))
-    return dist
-
-
-def dijkstra_with_path(
-    graph: Dict[int, List[Tuple[int, int]]], src: int, dst: int
-) -> Tuple[float, Optional[List[int]]]:
-    dist: Dict[int, float] = {src: 0.0}
-    prev: Dict[int, Optional[int]] = {src: None}
-    heap: List[Tuple[float, int]] = [(0.0, src)]
-    while heap:
-        d, u = heapq.heappop(heap)
-        if d > dist.get(u, float("inf")):
-            continue
-        if u == dst:
-            break
-        for v, w in graph.get(u, []):
-            nd = d + w
-            if nd < dist.get(v, float("inf")):
-                dist[v] = nd
-                prev[v] = u
-                heapq.heappush(heap, (nd, v))
-    if dst not in dist:
-        return (float("inf"), None)
-    path: List[int] = []
-    node: Optional[int] = dst
-    while node is not None:
-        path.append(node)
-        node = prev.get(node)
-    path.reverse()
-    return (dist[dst], path)
-```
-
 ## [Binary Search](topics/searching-sorting/binary-search.md) ★★★
 
 Binary search applies whenever you have a **sorted array** (or any monotonic predicate over an integer or real range): either to locate a target in O(log n), or to find the smallest/largest value satisfying some condition. The signal is "sorted input", "O(log n) required", or a feasibility check that flips from False to True exactly once as you move across a range. Time: O(log n). Space: O(1).
@@ -658,6 +369,295 @@ def monotonic_deque_max(nums: List[int], k: int) -> List[int]:
         if r >= k - 1:
             result.append(nums[dq[0]])
     return result
+```
+
+## [BFS](topics/graphs/bfs.md) ★★★
+
+BFS (Breadth-First Search) is the go-to algorithm for **shortest path in an unweighted graph**, level-order traversal, and "minimum steps to reach a state" problems. The signal is "shortest path," "minimum steps/moves," "level-order," grid problems where each cell-to-cell move costs 1, or state-space problems like word ladder and open-the-lock. Key property: FIFO queue ensures the first time you reach a node, you've taken the fewest edges. Time: O(V + E). Space: O(V).
+
+```python
+from collections import deque
+from typing import Dict, List, Set, Tuple
+
+
+def bfs_shortest_path(graph: Dict[int, List[int]], src: int, dst: int) -> int:
+    if src == dst:
+        return 0
+    visited: Set[int] = {src}
+    queue: deque = deque([(src, 0)])
+    while queue:
+        node, dist = queue.popleft()
+        for nb in graph.get(node, []):
+            if nb == dst:
+                return dist + 1
+            if nb not in visited:
+                visited.add(nb)
+                queue.append((nb, dist + 1))
+    return -1
+
+
+def bfs_grid(grid: List[List[int]], sources: List[Tuple[int, int]]) -> List[List[int]]:
+    rows, cols = len(grid), len(grid[0])
+    dist = [[float("inf")] * cols for _ in range(rows)]
+    queue: deque = deque()
+    for r, c in sources:
+        dist[r][c] = 0
+        queue.append((r, c))
+    dirs = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+    while queue:
+        r, c = queue.popleft()
+        for dr, dc in dirs:
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < rows and 0 <= nc < cols and dist[nr][nc] == float("inf"):
+                dist[nr][nc] = dist[r][c] + 1
+                queue.append((nr, nc))
+    return [[int(d) if d != float("inf") else -1 for d in row] for row in dist]
+
+
+def bidirectional_bfs(graph: Dict[int, List[int]], src: int, dst: int) -> int:
+    if src == dst:
+        return 0
+    front, back = {src}, {dst}
+    vf, vb = {src: 0}, {dst: 0}
+    d = 0
+    while front and back:
+        d += 1
+        if len(front) > len(back):
+            front, back, vf, vb = back, front, vb, vf
+        nxt: Set[int] = set()
+        for node in front:
+            for nb in graph.get(node, []):
+                if nb in vb:
+                    return d + vb[nb]
+                if nb not in vf:
+                    vf[nb] = d
+                    nxt.add(nb)
+        front = nxt
+    return -1
+```
+
+## [DFS](topics/graphs/dfs.md) ★★★
+
+DFS (Depth-First Search) is the workhorse for **connected components**, **cycle detection**, **path enumeration**, and any problem with a natural recursive decomposition on a graph. The signal is "connected components," "find all paths," "detect cycle," "explore everything reachable," or problems where the problem tree mirrors the call stack. Key insight: stack-based exploration goes as deep as possible before backtracking; post-order discovery (finish time) is the reverse of topological order. Time: O(V + E). Space: O(V) for the recursion stack.
+
+```python
+import sys
+from typing import Dict, List, Optional, Set
+
+
+def dfs_recursive(graph: Dict[int, List[int]], start: int, visited: Optional[Set[int]] = None) -> List[int]:
+    if visited is None:
+        visited = set()
+    visited.add(start)
+    order = [start]
+    for nb in graph.get(start, []):
+        if nb not in visited:
+            order.extend(dfs_recursive(graph, nb, visited))
+    return order
+
+
+def dfs_iterative(graph: Dict[int, List[int]], start: int) -> List[int]:
+    visited: Set[int] = set()
+    stack = [start]
+    order: List[int] = []
+    while stack:
+        node = stack.pop()
+        if node in visited:
+            continue
+        visited.add(node)
+        order.append(node)
+        for nb in reversed(graph.get(node, [])):
+            if nb not in visited:
+                stack.append(nb)
+    return order
+
+
+def has_cycle_directed(graph: Dict[int, List[int]]) -> bool:
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color: Dict[int, int] = {}
+    for u in graph:
+        color[u] = WHITE
+        for v in graph[u]:
+            if v not in color:
+                color[v] = WHITE
+
+    def dfs(u: int) -> bool:
+        color[u] = GRAY
+        for v in graph.get(u, []):
+            if color[v] == GRAY:
+                return True
+            if color[v] == WHITE and dfs(v):
+                return True
+        color[u] = BLACK
+        return False
+
+    return any(dfs(n) for n in list(color) if color[n] == WHITE)
+
+
+def connected_components(graph: Dict[int, List[int]]) -> List[List[int]]:
+    visited: Set[int] = set()
+    components: List[List[int]] = []
+    all_nodes: Set[int] = set(graph.keys())
+    for nbs in graph.values():
+        all_nodes.update(nbs)
+    for node in sorted(all_nodes):
+        if node not in visited:
+            comp: List[int] = []
+            stack = [node]
+            while stack:
+                u = stack.pop()
+                if u in visited:
+                    continue
+                visited.add(u)
+                comp.append(u)
+                for v in graph.get(u, []):
+                    if v not in visited:
+                        stack.append(v)
+            components.append(sorted(comp))
+    return components
+```
+
+## [Topological Sort](topics/graphs/topological-sort.md) ★★★
+
+Topological sort orders the nodes of a **DAG** (directed acyclic graph) so that every directed edge `u → v` has `u` appearing before `v`. The signal is "build order," "course prerequisites," "task scheduling with constraints," "compile order," or any problem that requires respecting dependency chains. Two equivalent algorithms: **Kahn's** (BFS-based, peels in-degree-0 nodes level by level) and **DFS-based** (post-order reversed). Kahn's naturally detects cycles; DFS-based is cleaner if you already have DFS set up. Time: O(V + E). Space: O(V).
+
+```python
+from collections import deque
+from typing import Dict, List, Optional
+
+
+def kahn(graph: Dict[int, List[int]], n: int) -> Optional[List[int]]:
+    in_degree = [0] * n
+    for u in range(n):
+        for v in graph.get(u, []):
+            in_degree[v] += 1
+    queue: deque = deque(i for i in range(n) if in_degree[i] == 0)
+    result: List[int] = []
+    while queue:
+        u = queue.popleft()
+        result.append(u)
+        for v in graph.get(u, []):
+            in_degree[v] -= 1
+            if in_degree[v] == 0:
+                queue.append(v)
+    return result if len(result) == n else None
+
+
+def dfs_topo(graph: Dict[int, List[int]], n: int) -> Optional[List[int]]:
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color = [WHITE] * n
+    result: List[int] = []
+
+    def dfs(u: int) -> bool:
+        color[u] = GRAY
+        for v in graph.get(u, []):
+            if color[v] == GRAY:
+                return True
+            if color[v] == WHITE and dfs(v):
+                return True
+        color[u] = BLACK
+        result.append(u)
+        return False
+
+    for i in range(n):
+        if color[i] == WHITE:
+            if dfs(i):
+                return None
+    result.reverse()
+    return result
+```
+
+## [Union-Find](topics/graphs/union-find.md) ★★★
+
+Union-Find (Disjoint Set Union, DSU) answers "are A and B in the same connected component?" and "merge two components" in nearly O(1) amortized time per operation. The signal is **incremental connectivity**: edges arrive one by one and you need to query or track connected components after each addition. Classic applications include Kruskal's MST, "number of connected components after online edge insertions," equivalence classes, and redundant connections. Time: O(α(n)) amortized per operation (inverse Ackermann — effectively constant for any practical n). Space: O(n).
+
+```python
+from typing import List
+
+
+class UnionFind:
+    def __init__(self, n: int) -> None:
+        self.parent: List[int] = list(range(n))
+        self.rank: List[int] = [0] * n
+        self.size: List[int] = [1] * n
+        self.num_components: int = n
+
+    def find(self, x: int) -> int:
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])
+        return self.parent[x]
+
+    def union(self, x: int, y: int) -> bool:
+        rx, ry = self.find(x), self.find(y)
+        if rx == ry:
+            return False
+        if self.rank[rx] < self.rank[ry]:
+            rx, ry = ry, rx
+        self.parent[ry] = rx
+        self.size[rx] += self.size[ry]
+        if self.rank[rx] == self.rank[ry]:
+            self.rank[rx] += 1
+        self.num_components -= 1
+        return True
+
+    def connected(self, x: int, y: int) -> bool:
+        return self.find(x) == self.find(y)
+
+    def component_size(self, x: int) -> int:
+        return self.size[self.find(x)]
+```
+
+## [Shortest Paths (Dijkstra)](topics/graphs/shortest-paths.md) ★★★
+
+Dijkstra's algorithm finds the shortest path from a source to all other nodes in a **weighted graph with non-negative edge weights**. The signal is "shortest path with weights," "minimum cost to traverse," or any weighted-graph distance question where edges are non-negative. A min-heap processes the closest unsettled node first; each node is settled at most once, giving O((V + E) log V) with a binary heap. For negative edges use **Bellman-Ford** (O(VE)); for all-pairs distances on small dense graphs use **Floyd-Warshall** (O(V³)). Space: O(V + E).
+
+```python
+import heapq
+from typing import Dict, List, Optional, Tuple
+
+
+def dijkstra(graph: Dict[int, List[Tuple[int, int]]], src: int) -> Dict[int, float]:
+    dist: Dict[int, float] = {src: 0.0}
+    heap: List[Tuple[float, int]] = [(0.0, src)]
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d > dist.get(u, float("inf")):
+            continue
+        for v, w in graph.get(u, []):
+            nd = d + w
+            if nd < dist.get(v, float("inf")):
+                dist[v] = nd
+                heapq.heappush(heap, (nd, v))
+    return dist
+
+
+def dijkstra_with_path(
+    graph: Dict[int, List[Tuple[int, int]]], src: int, dst: int
+) -> Tuple[float, Optional[List[int]]]:
+    dist: Dict[int, float] = {src: 0.0}
+    prev: Dict[int, Optional[int]] = {src: None}
+    heap: List[Tuple[float, int]] = [(0.0, src)]
+    while heap:
+        d, u = heapq.heappop(heap)
+        if d > dist.get(u, float("inf")):
+            continue
+        if u == dst:
+            break
+        for v, w in graph.get(u, []):
+            nd = d + w
+            if nd < dist.get(v, float("inf")):
+                dist[v] = nd
+                prev[v] = u
+                heapq.heappush(heap, (nd, v))
+    if dst not in dist:
+        return (float("inf"), None)
+    path: List[int] = []
+    node: Optional[int] = dst
+    while node is not None:
+        path.append(node)
+        node = prev.get(node)
+    path.reverse()
+    return (dist[dst], path)
 ```
 
 ## [1D DP](topics/dp/1d-dp.md) ★★★
