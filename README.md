@@ -30,6 +30,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★★★ [Shortest Paths (Dijkstra)](topics/graphs/shortest-paths.md)
 1. ★★★ [1D DP](topics/dp/1d-dp.md)
 1. ★★★ [2D DP](topics/dp/2d-dp.md)
+1. ★★★ [Interval DP](topics/dp/interval-dp.md)
 
 ## See also
 

@@ -719,3 +719,26 @@ def knapsack_01(weights: List[int], values: List[int], capacity: int) -> int:
             dp[cap] = max(dp[cap], dp[cap - w] + v)
     return dp[capacity]
 ```
+
+## [Interval DP](topics/dp/interval-dp.md) ★★★
+
+Interval DP applies when the problem asks you to optimally combine or partition a contiguous sequence — "merge piles," "burst balloons in best order," "matrix chain multiplication," "minimum cost to triangulate." The signal is that the cost of operating on a range `[i..j]` depends on how you split or order actions within it. Define `dp[i][j]` as the optimal answer for the subarray `[i..j]`; iterate over increasing interval lengths so all shorter subproblems are ready when you need them. Time: O(n³). Space: O(n²).
+
+```python
+from typing import List
+
+
+def interval_dp(arr: List[int]) -> int:
+    n = len(arr)
+    dp = [[0] * n for _ in range(n)]
+
+    for length in range(2, n + 1):          # iterate by interval length
+        for i in range(n - length + 1):
+            j = i + length - 1
+            dp[i][j] = float("inf")         # or -inf for maximization
+            for k in range(i, j):           # split point (or last-action point)
+                cost = dp[i][k] + dp[k + 1][j]  # + merge_cost(i, k, j)
+                dp[i][j] = min(dp[i][j], cost)
+
+    return dp[0][n - 1]
+```
