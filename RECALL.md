@@ -1836,3 +1836,33 @@ def manacher(s: str) -> tuple[int, str]:
     start = (best_i - length) // 2
     return length, s[start: start + length]
 ```
+
+## [Z-Algorithm](topics/nice-to-have/z-algorithm.md) ★
+
+The Z-algorithm computes in O(n) the **Z-array** for a string `s`, where `Z[i]` is the length of the longest substring starting at index `i` that matches a prefix of `s`. The signal is "find pattern in text" (alternative to KMP), "longest happy prefix," or any problem requiring prefix-match lengths at every position. Build it with a sliding `(l, r)` window — the rightmost matching prefix seen — reusing mirror comparisons. For matching, concatenate `pattern + '$' + text` and look for `Z[i] >= len(pattern)`. Time: O(n). Space: O(n).
+
+```python
+def z_function(s: str) -> list[int]:
+    n = len(s)
+    if n == 0:
+        return []
+    Z = [0] * n
+    Z[0] = n
+    l = r = 0
+    for i in range(1, n):
+        if i < r:
+            Z[i] = min(r - i, Z[i - l])
+        while i + Z[i] < n and s[Z[i]] == s[i + Z[i]]:
+            Z[i] += 1
+        if i + Z[i] > r:
+            l, r = i, i + Z[i]
+    return Z
+
+
+def z_search(text: str, pattern: str) -> list[int]:
+    if not pattern:
+        return list(range(len(text) + 1))
+    m = len(pattern)
+    Z = z_function(pattern + "$" + text)
+    return [i - m - 1 for i in range(m + 1, len(Z)) if Z[i] >= m]
+```
