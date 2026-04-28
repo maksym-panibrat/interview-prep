@@ -63,7 +63,8 @@ lo = 1, hi = max(piles) = 11
 feasible(6): ceil(3/6)+ceil(6/6)+ceil(7/6)+ceil(11/6) = 1+1+2+2 = 6 <= 8  → True
 feasible(4): ceil(3/4)+ceil(6/4)+ceil(7/4)+ceil(11/4) = 1+2+2+3 = 8 <= 8  → True
 feasible(3): ceil(3/3)+ceil(6/3)+ceil(7/3)+ceil(11/3) = 1+2+3+4 = 10 > 8  → False
-feasible(4): already True → lo converges to 4
+feasible(4): true (already shown above) → lo stays high, hi=4 (range narrows further). With lo=hi=4 the loop exits.
+Result: 4 hours per banana — the smallest feasible rate.
 ```
 
 Answer: 4. This pattern — binary search on the *answer value*, not array indices — is one of the highest-leverage patterns to internalize.
@@ -125,7 +126,7 @@ def search_on_answer(lo: int, hi: int, feasible: Callable[[int], bool]) -> int:
     """Generic template: smallest integer x in [lo, hi] where feasible(x) is True.
 
     Assumes feasible is monotonic: False ... False True ... True over [lo, hi].
-    Returns hi + 1 if no feasible value exists (caller should guard against this).
+    Returns `hi` if no feasible value exists in `[lo, hi]`; the caller should check `feasible(result)` if the no-solution case is possible.
     """
     while lo < hi:
         mid = lo + (hi - lo) // 2
@@ -244,7 +245,7 @@ The template is `search_on_answer` above. This is one of the highest-leverage pa
 - **`mid = (lo + hi) // 2` overflow**: Not an issue in Python (arbitrary-precision integers), but in C++/Java use `lo + (hi - lo) // 2` to avoid signed-integer overflow when `lo + hi` exceeds `INT_MAX`.
 - **`lo < hi` vs `lo <= hi`**: Classic exact-match uses `<=`; boundary-search uses `<`. Mixing these up either skips the last candidate or loops forever.
 - **Forgetting `lo = mid + 1`** (writing `lo = mid`): When `feasible(mid)` is False and you set `lo = mid`, `mid` is always `(lo + lo) // 2 == lo`, so `lo` never advances — infinite loop. Always write `lo = mid + 1` to discard `mid`.
-- **Wrong invariant for `bisect_*`**: `bisect_left` sets `hi = mid` (not `mid - 1`) because `mid` might be the first `>= target`; `bisect_right` sets `hi = mid` because `mid` might be the first `> target`. Getting these backwards shifts the result by 1.
+- **Wrong invariant for `bisect_*`**: The *only* difference between `bisect_left` and `bisect_right` is the comparison in the lo-advance branch: `nums[mid] < target` (left) vs `nums[mid] <= target` (right). The `hi = mid` rule is identical for both. Confusing the two by a single character flips the result for runs of equal elements — left finds the first occurrence, right finds the position just after the last.
 
 ## 6. Complexity
 
@@ -273,7 +274,7 @@ The template is `search_on_answer` above. This is one of the highest-leverage pa
 ## 9. Interviewer follow-ups
 
 **Q: What changes if the array has duplicates?**
-Classic binary search still finds *a* match but not necessarily the first or last. Use `bisect_left` to get the leftmost index of `target` and `bisect_right` to get one past the rightmost. The range of all occurrences is `[bisect_left(nums, target), bisect_right(nums, target))`. If that range is empty (i.e., `bisect_left` returns an index where `nums[idx] != target`), the element is absent.
+Classic binary search still finds *a* match but not necessarily the first or last. Use `bisect_left` to get the leftmost index of `target` and `bisect_right` to get one past the rightmost. The range of all occurrences is `[bisect_left(nums, target), bisect_right(nums, target))`. If `bisect_left` returns `idx`, the element is present iff `idx < len(nums) and nums[idx] == target`. The bounds check matters: `bisect_left` returns `len(nums)` when the target is larger than every element, so indexing `nums[idx]` would raise `IndexError` without it.
 
 **Q: What if the array is rotated?**
 At every `mid`, one of the two halves `[lo, mid]` or `[mid, hi]` is guaranteed to be sorted (compare `nums[lo]` with `nums[mid]`). Check whether the target falls within the sorted half. If yes, discard the other half; if no, discard the sorted half. This keeps O(log n) time with no pivot-finding pre-pass.

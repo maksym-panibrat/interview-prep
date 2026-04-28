@@ -1,4 +1,5 @@
 """Binary search templates. See ../topics/searching-sorting/binary-search.md."""
+# Note: bisect_left / bisect_right shadow Python's stdlib bisect module — namespace appropriately if you import bisect.
 from typing import Callable, List
 
 
