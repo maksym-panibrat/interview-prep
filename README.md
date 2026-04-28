@@ -52,6 +52,7 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 1. ★ [Minimum Spanning Tree](topics/nice-to-have/mst.md)
 1. ★ [Max Flow / Min Cut](topics/nice-to-have/max-flow.md)
 1. ★ [Reservoir Sampling](topics/nice-to-have/reservoir-sampling.md)
+1. ★ [Manacher's Algorithm](topics/nice-to-have/manacher.md)
 
 ## See also
 

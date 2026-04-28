@@ -1808,3 +1808,31 @@ def reservoir_sample_k(stream: Iterator[T], k: int) -> List[T]:
                 reservoir[j] = item
     return reservoir
 ```
+
+## [Manacher's Algorithm](topics/nice-to-have/manacher.md) ★
+
+Manacher's algorithm finds the **longest palindromic substring** (and counts all palindromic substrings) in O(n) time. The signal is "palindromic substring" when expand-around-center's O(n²) is too slow, or when an O(n) guarantee is explicitly required. Inserts separator characters to unify even/odd palindromes, then exploits a "current rightmost palindrome" to skip redundant comparisons. Time: O(n). Space: O(n).
+
+```python
+def manacher(s: str) -> tuple[int, str]:
+    if not s:
+        return 0, ""
+    T = "#" + "#".join(s) + "#"
+    n = len(T)
+    P = [0] * n
+    c = r = 0
+    for i in range(n):
+        if i < r:
+            P[i] = min(P[2 * c - i], r - i)
+        lo, hi = i - (P[i] + 1), i + (P[i] + 1)
+        while lo >= 0 and hi < n and T[lo] == T[hi]:
+            P[i] += 1
+            lo -= 1
+            hi += 1
+        if i + P[i] > r:
+            c, r = i, i + P[i]
+    best_i = max(range(n), key=lambda x: P[x])
+    length = P[best_i]
+    start = (best_i - length) // 2
+    return length, s[start: start + length]
+```
