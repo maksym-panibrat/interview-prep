@@ -1,0 +1,98 @@
+# Replication
+
+## 1. TL;DR
+
+**Replication** keeps copies of the same data on multiple nodes so the system survives node loss, scales reads, and serves geographically distributed clients with local latency. The whole topic is a 3 by 3 matrix: a **model** — single-leader, multi-leader, or leaderless — and a **timing** — synchronous, asynchronous, or semi-synchronous. Every choice trades consistency, write latency, and availability against each other; the wrong combination drops data on failover, stalls on a slow replica, or quietly serves stale reads. There is no "best" setup, only a set of failure modes you have explicitly chosen to live with.
+
+## 2. How it works
+
+### Single-leader (primary-replica)
+
+One node is the **leader**; it accepts all writes, appends them to a change log, and streams the log to **followers** that apply the same changes in the same order. Reads can hit the leader or any follower. This is the default for most relational databases — Postgres, MySQL, MongoDB replica sets — because the consistency model is simple: a single serial point for writes, followers converge.
+
+```
+                      writes
+                         |
+                         v
+            +------------+------------+
+            |          Leader         |
+            +------------+------------+
+                         |
+              streaming log (WAL/binlog)
+                         |
+             +-----------+-----------+
+             v           v           v
+         Follower    Follower    Follower
+            |           |           |
+           reads       reads       reads
+```
+
+The leader is a bottleneck for writes and a SPOF until failover completes.
+
+### Multi-leader
+
+Multiple nodes accept writes — typically one leader per region — and replicate to each other. You get write availability under regional partition and lower write latency for users near a local leader. The cost is **conflict resolution**: two regions can write the same row simultaneously, and you need a deterministic rule for what wins. Options ranked by data-loss risk: **last-write-wins** (a timestamp picks one, drops the other — simple, lossy), **CRDTs** (merges are commutative and associative — no loss, but you only get what the CRDT allows: counters, sets, registers, ordered lists), and **application-level merge** (custom code per type — no loss, full flexibility, expensive).
+
+### Leaderless (Dynamo-style)
+
+There is no leader. The client (or a coordinator) writes to **N** replicas and reads from a quorum; success requires **W** acks on write and **R** on read, with `W + R > N` for quorum overlap. Replicas reconcile via **read repair**, **anti-entropy** (Merkle-tree sweeps), and **hinted handoff** (a peer holds writes for a temporarily unreachable node and replays them on recovery). Cassandra and DynamoDB are the canonical examples. Highly available — any node can take a write — but consistency is weak unless quorums are tuned, and even then not linearizable. Quorum mechanics get their own depth in `quorum-consistency.md`.
+
+### Synchronous vs asynchronous vs semi-synchronous
+
+These are independent of model — they describe *when the write returns to the client*.
+
+```
+sync:       client -> leader -> follower(s) ack -> client
+                                  ^ blocks here until ack
+async:      client -> leader -> client
+                         \-> follower (fire-and-forget)
+semi-sync:  client -> leader -> at least one follower ack -> client
+```
+
+**Synchronous** waits for replica acks before acknowledging the client. Strong durability — a committed write survives leader loss — but write latency equals the slowest replica, and one slow replica stalls every writer. **Asynchronous** acks the client as soon as the leader has the write; replicas catch up on their own time. Fast writes, but a leader crash loses everything not yet shipped — measured as RPO in seconds. **Semi-synchronous** waits for at least one replica ack: durability of "at least two copies" without the liveness problems of full sync.
+
+### Failover and split brain
+
+When the leader fails, the cluster must detect the failure, elect a new leader, and route writes to it. Detection is timeout-based and inherently ambiguous — "slow" and "dead" look identical from outside. Promote too eagerly and the old leader returns to find a new one has accepted conflicting writes: **split brain**. Two leaders, both convinced they own the cluster, divergence guaranteed.
+
+Defenses are **quorum-based leader election** (a majority must agree, so two leaders cannot both have a majority — Raft and Paxos; depth in `leader-election-consensus.md`), **fencing tokens** (each new leader gets a monotonically increasing token, replicas reject writes from a stale one), and **STONITH** ("shoot the other node in the head" — physically power off or network-isolate the old leader before promoting a new one).
+
+### Replication lag
+
+Async (and semi-sync) followers are behind the leader by milliseconds to seconds in healthy state, by minutes when a follower stalls. The user-visible failure mode is **read-after-write inconsistency**: a user updates their profile against the leader, the next request hits a follower that has not yet replicated the change, and the UI shows the old value. The fixes are routing-based — pin reads to the leader for some session window after a write, or to a follower that has replicated past a known log position the client carries.
+
+## 3. When to use
+
+- **Durability.** A node disk dies; another copy survives. The minimum reason to replicate any production datastore.
+- **Read scaling.** Add followers, route reads to them, multiply read throughput. Works because most workloads are read-heavy.
+- **Geo-distribution.** A replica per region gives users local-latency reads and survives a region outage.
+- **High availability.** Failover shrinks the unavailable window from "until human intervention" to seconds, if the failover machinery is right.
+
+Anti-signals:
+
+- **Data that does not need durability or scale.** Cache contents, ephemeral session state, derivable views — replicating them costs complexity and yields nothing the next miss cannot recover.
+- **Replication as a substitute for backups.** Replicas faithfully replicate corruption and `DROP TABLE`. You still need point-in-time backups.
+
+## 4. Trade-offs and failure modes
+
+- **Replication lag and stale reads.** Async followers serve stale data. Read-your-writes requires either pinning the user's reads to the leader for a window, or carrying a log position with the request and waiting for the follower to catch up.
+- **Split brain after failover.** Two nodes both believe they are leader. Fence the old leader (token, STONITH) and require quorum for election. Without these, a "self-healing" partition silently corrupts your data.
+- **Sync replication is a liveness trap.** With full sync, write latency equals the slowest replica, and any unhealthy replica blocks the cluster. Production systems run semi-sync, sync to a small subset, or auto-degrade a lagging replica out of the sync set.
+- **Multi-leader conflicts.** LWW silently drops one of two concurrent writes. CRDTs avoid loss but constrain what operations you can express. Application merge is correct and expensive. Most teams pick LWW and accept the risk; high-stakes systems use CRDTs or stay single-leader.
+- **Topology choices.** **Chain** (leader to A to B to C) has low fan-in but a long tail and no path around a dead middle node. **Star** has a single fan-out hub that is a bottleneck and SPOF. **All-to-all** has the most paths but the hardest conflict-detection problem; the typical multi-leader topology.
+- **Backfill cost.** A new replica must transfer the entire dataset before joining the streaming log. Unthrottled crushes the leader; throttled takes hours or days. Most systems support a base snapshot plus log-tail catch-up.
+- **Replication does not help logical errors.** Schema changes, mass deletes, application bugs that corrupt rows — replication multiplies them across every node instantly. Backups, not replicas, save you here.
+
+## 5. Real-world and interviewer probes
+
+In the wild, **Postgres** does single-leader streaming replication with sync, async, and semi-sync modes (`synchronous_commit`, `synchronous_standby_names`). **MySQL** uses binlog replication, single-leader, with semi-sync available. **MongoDB** replica sets are single-leader with Raft-like elections. **Cassandra** and **DynamoDB** are leaderless with tunable quorums (`R`, `W`, `N`). **CockroachDB** and **Spanner** replicate per-range with Raft, giving per-range single-leader semantics globally. **Kafka** elects a leader per partition and replicates to in-sync replicas (the ISR set); `acks=all` waits for every ISR replica.
+
+Probes you should expect:
+
+- *"Sync vs. async vs. semi-sync — when?"* — Financial or no-data-loss workloads → sync, accepting the latency tax. Latency-sensitive workloads with a tolerable RPO → async with a replica-lag SLO. The default is semi-sync: one replica ack, durability of "at least two copies", no full-sync liveness trap.
+- *"How do you avoid split brain?"* — Quorum-based leader election (Raft / Paxos), monotonic fencing tokens replicas verify before accepting writes, and STONITH when the old leader's network must be cut before promoting a new one.
+- *"Read-your-writes on a read replica?"* — Either route reads to the leader for a session window after a write, or carry a log sequence number with each request and have the replica wait until it has applied past that position.
+- *"Multi-leader conflict resolution?"* — LWW: simple, silently lossy. CRDTs: no loss, limited operations. Application merge: correct, custom, expensive. Pick by how much loss you can tolerate; most teams pick LWW because they have not measured it.
+- *"Why not sync to all replicas always?"* — Latency equals the slowest replica, and one slow replica stalls every writer. Run semi-sync, sync to a small quorum, or auto-degrade a lagging replica out of the sync set.
+- *"Failover detection — too fast vs. too slow?"* — Too fast and you flap on transient blips, promoting leaders that race the old one. Too slow and the unavailable window grows. Standard answer: multi-second timeouts plus quorum confirmation before promotion.
+- *"What does replication not protect against?"* — Logical corruption, bad migrations, application bugs, ransomware. Replicas faithfully copy all of those. You still need backups.
