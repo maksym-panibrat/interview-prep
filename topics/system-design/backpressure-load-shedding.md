@@ -76,7 +76,7 @@ arrival rate
 
 ## 5. Real-world and interviewer probes
 
-**In the wild.** Envoy and Linkerd implement circuit-breaker-style concurrency limits per upstream cluster — in-flight over the cap, new requests fast-fail. Kafka's consumer-side `max.poll.records` is direct backpressure: the consumer pulls only what it can handle, so the broker stays a durable log rather than a queue. AWS Lambda's reserved concurrency is admission control — beyond the reservation, the platform sheds with throttle errors so other functions aren't starved; provisioned concurrency warms the pool so admitted requests don't pay cold-start. Netflix's `concurrency-limits` is the canonical AIMD reference. Akka Streams and Project Reactor make backpressure the default — you opt out (`onBackpressureDrop`) to get a shed.
+**In the wild.** Envoy and Linkerd implement circuit-breaker-style concurrency limits per upstream cluster — in-flight over the cap, new requests fast-fail. Kafka's consumer-side `max.poll.records` is direct backpressure: the consumer pulls only what it can handle, so the broker stays a durable log rather than a queue. AWS Lambda's **reserved concurrency** both guarantees a function its slice of the account-wide concurrency pool and caps it there — isolation in both directions, so the function can't be starved by noisy neighbours and can't starve them either; **provisioned concurrency** pre-warms the pool so admitted requests don't pay cold-start latency. Netflix's `concurrency-limits` is the canonical AIMD reference. Akka Streams and Project Reactor make backpressure the default — you opt out (`onBackpressureDrop`) to get a shed.
 
 **Probes.**
 
