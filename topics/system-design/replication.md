@@ -8,7 +8,7 @@
 
 ### Single-leader (primary-replica)
 
-One node is the **leader**; it accepts all writes, appends them to a change log, and streams the log to **followers** that apply the same changes in the same order. Reads can hit the leader or any follower. This is the default for most relational databases — Postgres, MySQL, MongoDB replica sets — because the consistency model is simple: a single serial point for writes, followers converge.
+One node is the **leader**; it accepts all writes, appends them to a change log, and streams the log to **followers** that apply the same changes in the same order. Reads can hit the leader or any follower. This is the default for most operational datastores — Postgres, MySQL, MongoDB replica sets — because the consistency model is simple: a single serial point for writes, followers converge.
 
 ```
                       writes
@@ -42,11 +42,16 @@ There is no leader. The client (or a coordinator) writes to **N** replicas and r
 These are independent of model — they describe *when the write returns to the client*.
 
 ```
-sync:       client -> leader -> follower(s) ack -> client
-                                  ^ blocks here until ack
+sync:       client -> leader -> follower(s)
+            client <- leader <- (ack)
+                       ^ leader blocks until follower ack(s) before replying
+
 async:      client -> leader -> client
                          \-> follower (fire-and-forget)
-semi-sync:  client -> leader -> at least one follower ack -> client
+
+semi-sync:  client -> leader -> follower(s)
+            client <- leader <- (ack from >= 1 follower)
+                       ^ leader blocks until at least one follower acks
 ```
 
 **Synchronous** waits for replica acks before acknowledging the client. Strong durability — a committed write survives leader loss — but write latency equals the slowest replica, and one slow replica stalls every writer. **Asynchronous** acks the client as soon as the leader has the write; replicas catch up on their own time. Fast writes, but a leader crash loses everything not yet shipped — measured as RPO in seconds. **Semi-synchronous** waits for at least one replica ack: durability of "at least two copies" without the liveness problems of full sync.
