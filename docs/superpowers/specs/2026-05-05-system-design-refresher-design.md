@@ -50,7 +50,7 @@ This matches the existing convention (`topics/<category>/<topic>.md`).
 
 ### 3.2 README
 
-Extend `README.md` with a new top-level section **System Design** below the existing **Study order** section. List the 18 topics grouped by problem-solved (no tier markers — single-tier core).
+Extend `README.md` with a new top-level section **System Design** below the existing **Study order** section. List the topics grouped by problem-solved (no tier markers — single-tier core).
 
 ### 3.3 RECALL
 
@@ -62,13 +62,13 @@ Not applicable. System-design topics have no Python implementations to template.
 
 ### 3.5 Verifier
 
-`scripts/verify.py` currently enforces a single 9-section schema for all topic files. It needs to be extended to support a **second schema** (5 sections — see §4) selected by directory: files under `topics/system-design/` use the system-design schema; everything else continues to use the algorithm schema. Internal-link checking and Python-block parsing apply to both.
+`scripts/verify.py` currently enforces a single 9-section schema for all topic files. It needs to be extended to support a **second schema** (see §4) selected by directory: files under `topics/system-design/` use the system-design schema; everything else continues to use the algorithm schema. Internal-link checking and Python-block parsing apply to both.
 
 Files starting with `_` (e.g., `_TEMPLATE.md`) continue to be skipped — already-existing behavior.
 
 ## 4. Topic template
 
-Each system-design topic file uses this 5-section template. Sections are ordered the way someone reading the topic for understanding (not just recall) wants them.
+Each system-design topic file uses this template (the verifier enforces section presence). Sections are ordered the way someone reading the topic for understanding (not just recall) wants them.
 
 ```
 # <Topic>
@@ -96,90 +96,88 @@ production. Concrete failure modes (e.g., "cache stampede on TTL expiry",
   one-or-two-sentence answers that demonstrate depth.
 ```
 
-**Length target:** ~800–1500 words per topic. Refresher density, not textbook density. A senior engineer should be able to read a topic in 5–8 minutes and walk away ready to discuss it cold.
+**Length target:** refresher density, not textbook density. A senior engineer should be able to read a topic in a few minutes and walk away ready to discuss it cold.
 
-## 5. Topic list (19 topics)
+## 5. Topic list
 
-Grouped by **problem solved**, not by tier — patterns within a group are usually composed in real designs, so co-location aids both reading and recall. Order within README will follow this grouping.
+Grouped by **problem solved**, not by tier — patterns within a group are usually composed in real designs, so co-location aids both reading and recall. Order within README will follow this grouping. The list below is the agreed core; treat it as the starting set, not a fixed-size cap (topics may merge or split during writing).
 
-(Working assumption from the brainstorm was "18 topics, tight core." Final count is 19 — the **observability trio** (§5.10) was originally borderline but rates inclusion under the same filter. If you want it cut, drop §5.10 and the count goes back to 18.)
+### Reliable service-to-service communication
 
-### 5.1 Reliable service-to-service communication
+- **Resilience four-pack** — `topics/system-design/resilience-four-pack.md`
+  Timeout + retry-with-jittered-backoff + circuit breaker + bulkhead. One topic because they are never deployed alone — every retry needs a timeout, every retry storm needs a breaker, every breaker needs a bulkhead to isolate the blast radius.
 
-1. **Resilience four-pack** — `topics/system-design/resilience-four-pack.md`
-   Timeout + retry-with-jittered-backoff + circuit breaker + bulkhead. One topic because they are never deployed alone — every retry needs a timeout, every retry storm needs a breaker, every breaker needs a bulkhead to isolate the blast radius.
+- **Idempotency** — `topics/system-design/idempotency.md`
+  Idempotency keys, dedup windows, idempotent consumers. The "exactly-once delivery is a myth, exactly-once *effects* is achievable" framing lives here.
 
-2. **Idempotency** — `topics/system-design/idempotency.md`
-   Idempotency keys, dedup windows, idempotent consumers. The "exactly-once delivery is a myth, exactly-once *effects* is achievable" framing lives here.
+- **Backpressure and load shedding** — `topics/system-design/backpressure-load-shedding.md`
+  Queue-depth signals, drop-vs-block, priority shedding, admission control. The pattern that keeps a degraded system from becoming a dead system.
 
-3. **Backpressure and load shedding** — `topics/system-design/backpressure-load-shedding.md`
-   Queue-depth signals, drop-vs-block, priority shedding, admission control. The pattern that keeps a degraded system from becoming a dead system.
+### Reliable data flow across services
 
-### 5.2 Reliable data flow across services
+- **Transactional outbox + CDC** — `topics/system-design/outbox-cdc.md`
+  The canonical answer to the dual-write problem. Combined because outbox is the producer side and CDC is the consumer/transport side of the same picture.
 
-4. **Transactional outbox + CDC** — `topics/system-design/outbox-cdc.md`
-   The canonical answer to the dual-write problem. Combined because outbox is the producer side and CDC is the consumer/transport side of the same picture.
+- **Saga pattern** — `topics/system-design/saga.md`
+  Choreography vs orchestration, compensating actions, semantic locks. Includes a short "why 2PC is usually a smell" foil.
 
-5. **Saga pattern** — `topics/system-design/saga.md`
-   Choreography vs orchestration, compensating actions, semantic locks. Includes a short "why 2PC is usually a smell" foil.
+### Scaling reads
 
-### 5.3 Scaling reads
+- **Caching strategies + stampede mitigation** — `topics/system-design/caching.md`
+  Cache-aside / read-through / write-through / write-back. Single-flight, jittered TTL, stale-while-revalidate, negative caching, cache warming. Combined because stampede mitigation only makes sense alongside the strategy that creates the stampede risk.
 
-6. **Caching strategies + stampede mitigation** — `topics/system-design/caching.md`
-   Cache-aside / read-through / write-through / write-back. Single-flight, jittered TTL, stale-while-revalidate, negative caching, cache warming. Combined because stampede mitigation only makes sense alongside the strategy that creates the stampede risk.
+- **CQRS + materialized read models** — `topics/system-design/cqrs-read-models.md`
+  When read shape diverges from write shape; replay; the cost (consistency lag, dual schemas, ops complexity). Event sourcing referenced here, not as standalone.
 
-7. **CQRS + materialized read models** — `topics/system-design/cqrs-read-models.md`
-   When read shape diverges from write shape; replay; the cost (consistency lag, dual schemas, ops complexity). Event sourcing referenced here, not as standalone.
+### Data distribution and write scaling
 
-### 5.4 Data distribution and write scaling
+- **Sharding strategies** — `topics/system-design/sharding.md`
+  Range / hash / directory. Rebalancing. Hot-partition rescue (key salting, secondary keys). Cross-shard queries. Resharding without downtime.
 
-8. **Sharding strategies** — `topics/system-design/sharding.md`
-   Range / hash / directory. Rebalancing. Hot-partition rescue (key salting, secondary keys). Cross-shard queries. Resharding without downtime.
+- **Consistent hashing** — `topics/system-design/consistent-hashing.md`
+  Virtual nodes, ring math, why DynamoDB / Cassandra / memcached client routing all use it. The math of "what fraction of keys move when a node joins/leaves."
 
-9. **Consistent hashing** — `topics/system-design/consistent-hashing.md`
-   Virtual nodes, ring math, why DynamoDB / Cassandra / memcached client routing all use it. The math of "what fraction of keys move when a node joins/leaves."
+- **Replication models** — `topics/system-design/replication.md`
+  Single-leader / multi-leader / leaderless. Sync vs async vs semi-sync. Failover. Replication lag and read-your-writes. Brief mention of geo-distribution as a flavor.
 
-10. **Replication models** — `topics/system-design/replication.md`
-    Single-leader / multi-leader / leaderless. Sync vs async vs semi-sync. Failover. Replication lag and read-your-writes. Brief mention of geo-distribution as a flavor.
+- **Quorum and tunable consistency** — `topics/system-design/quorum-consistency.md`
+  R + W > N. Read repair. Hinted handoff. Last-write-wins vs version vectors. CAP and PACELC enter implicitly here, not as standalone topics.
 
-11. **Quorum and tunable consistency** — `topics/system-design/quorum-consistency.md`
-    R + W > N. Read repair. Hinted handoff. Last-write-wins vs version vectors. CAP and PACELC enter implicitly here, not as standalone topics.
+### Coordination
 
-### 5.5 Coordination
+- **Leader election and consensus** — `topics/system-design/leader-election-consensus.md`
+  Raft architecturally. The "do I actually need consensus or does eventual consistency suffice?" framing. Quorum-based commit. Brief mention of Paxos by name.
 
-12. **Leader election and consensus** — `topics/system-design/leader-election-consensus.md`
-    Raft architecturally. The "do I actually need consensus or does eventual consistency suffice?" framing. Quorum-based commit. Brief mention of Paxos by name.
+- **Distributed locks done right** — `topics/system-design/distributed-locks.md`
+  Leases instead of locks. Fencing tokens. The Redlock debate. Why optimistic concurrency control is usually the better answer.
 
-13. **Distributed locks done right** — `topics/system-design/distributed-locks.md`
-    Leases instead of locks. Fencing tokens. The Redlock debate. Why optimistic concurrency control is usually the better answer.
+### Throttling and fairness
 
-### 5.6 Throttling and fairness
+- **Rate limiting** — `topics/system-design/rate-limiting.md`
+  Token bucket / leaky bucket / sliding-window-counter / sliding-window-log. Distributed quota (centralized counter vs probabilistic local). Gateway-side vs client-side. Per-key vs per-tenant.
 
-14. **Rate limiting** — `topics/system-design/rate-limiting.md`
-    Token bucket / leaky bucket / sliding-window-counter / sliding-window-log. Distributed quota (centralized counter vs probabilistic local). Gateway-side vs client-side. Per-key vs per-tenant.
+### Event-driven plumbing
 
-### 5.7 Event-driven plumbing
+- **Pub/sub semantics** — `topics/system-design/pubsub-semantics.md`
+  At-least-once vs at-most-once vs exactly-once-effects. Ordering and partition keys. Consumer groups. Dead-letter queues. Replay. Why "exactly-once delivery" is a marketing term.
 
-15. **Pub/sub semantics** — `topics/system-design/pubsub-semantics.md`
-    At-least-once vs at-most-once vs exactly-once-effects. Ordering and partition keys. Consumer groups. Dead-letter queues. Replay. Why "exactly-once delivery" is a marketing term.
+### Probabilistic structures at scale
 
-### 5.8 Probabilistic structures at scale
+- **Bloom filters and HyperLogLog** — `topics/system-design/bloom-hll.md`
+  Combined because both are "probabilistic shortcuts to skip expensive work" — Bloom for membership ("is this key worth a disk seek?"), HLL for cardinality ("how many uniques without a hashset"). When the false-positive / approximate-count budget is worth the savings.
 
-16. **Bloom filters and HyperLogLog** — `topics/system-design/bloom-hll.md`
-    Combined because both are "probabilistic shortcuts to skip expensive work" — Bloom for membership ("is this key worth a disk seek?"), HLL for cardinality ("how many uniques without a hashset"). When the false-positive / approximate-count budget is worth the savings.
+### Evolution in production
 
-### 5.9 Evolution in production
+- **Schema evolution and backward compatibility** — `topics/system-design/schema-evolution.md`
+  Protobuf / Avro forward + backward compatibility rules. Expand-contract migrations. Double-writing. Versioned events. The "old code, new data; new code, old data" matrix.
 
-17. **Schema evolution and backward compatibility** — `topics/system-design/schema-evolution.md`
-    Protobuf / Avro forward + backward compatibility rules. Expand-contract migrations. Double-writing. Versioned events. The "old code, new data; new code, old data" matrix.
+- **Strangler fig** — `topics/system-design/strangler-fig.md`
+  Incremental replacement of a legacy system. Routing strategies (proxy, ambassador). Read/write split during migration. Knowing when to delete.
 
-18. **Strangler fig** — `topics/system-design/strangler-fig.md`
-    Incremental replacement of a legacy system. Routing strategies (proxy, ambassador). Read/write split during migration. Knowing when to delete.
+### Production observability
 
-### 5.10 Production observability
-
-19. **Golden signals + tracing trio** — `topics/system-design/observability-trio.md`
-    RED (rate, errors, duration) and USE (utilization, saturation, errors). Correlation-ID propagation across services. Structured logging. Distributed tracing (sampling, span hierarchy). Combined because logs / metrics / traces are practiced as one discipline.
+- **Golden signals + tracing trio** — `topics/system-design/observability-trio.md`
+  RED (rate, errors, duration) and USE (utilization, saturation, errors). Correlation-ID propagation across services. Structured logging. Distributed tracing (sampling, span hierarchy). Combined because logs / metrics / traces are practiced as one discipline.
 
 ## 6. Conventions
 
@@ -192,19 +190,19 @@ Grouped by **problem solved**, not by tier — patterns within a group are usual
 ## 7. Tooling changes
 
 1. **`scripts/verify.py`** — extend to dispatch on directory:
-   - `topics/system-design/*.md` → 5-section system-design schema (TL;DR / How it works / When to use / Trade-offs and failure modes / Real-world and interviewer probes).
-   - everything else → existing 9-section algorithm schema (unchanged).
+   - `topics/system-design/*.md` → system-design schema (TL;DR / How it works / When to use / Trade-offs and failure modes / Real-world and interviewer probes).
+   - everything else → existing algorithm schema (unchanged).
    - Internal-link checking and Python-block parsing run for both.
 2. **`topics/system-design/_TEMPLATE.md`** — author the system-design template file matching §4.
-3. **`README.md`** — add the System Design section listing the 19 topics in problem-solved order.
+3. **`README.md`** — add the System Design section listing the topics in problem-solved order.
 
 ## 8. Success criteria
 
-- All 19 topic files exist under `topics/system-design/` and pass `verify.py`.
+- Every topic in §5 has a file under `topics/system-design/` that passes `verify.py`.
 - `_TEMPLATE.md` exists and is excluded from verification (existing `_`-prefix rule).
-- `README.md` lists the 19 topics under a new "System Design" heading, grouped by §5 categories.
-- `verify.py` enforces the 5-section schema for the new directory and the 9-section schema for everything else; existing algorithm files continue to pass.
-- Each topic reads in ~5–8 minutes and gives the senior reader the mechanics, the trade-offs, and the questions to expect.
+- `README.md` has a new **System Design** heading that lists the topics grouped by the §5 categories.
+- `verify.py` enforces the system-design schema for the new directory and the existing algorithm schema for everything else; existing algorithm files continue to pass.
+- Each topic reads in a few minutes and gives the senior reader the mechanics, the trade-offs, and the questions to expect.
 
 ## 9. Future expansion (out of scope for this spec)
 
