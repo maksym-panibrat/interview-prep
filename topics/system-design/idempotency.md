@@ -91,7 +91,7 @@ Anti-signals:
 
 - **Stripe** standardized the `Idempotency-Key` HTTP header. Keys are retained for **24 hours**, and the server returns the original response — including the original status code — on replay. Same key with a mismatched body is rejected.
 - **AWS SQS FIFO** queues accept a `MessageDeduplicationId` and dedup within a **5-minute** window — the "minutes, not days" rule in production.
-- **Kafka** producers with `enable.idempotence=true` get per-partition sequence numbers from the broker, so retried produces dedup at the broker.
+- **Kafka** producers with `enable.idempotence=true` are assigned a producer ID (PID) by the broker and tag each record with a per-partition sequence number; the broker rejects records whose `(PID, partition, sequence)` it has already seen, eliminating duplicates from broker-side retries.
 - **DynamoDB** exposes `ClientRequestToken` on transactional writes for the same purpose.
 
 **Probes.**
