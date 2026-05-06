@@ -71,7 +71,7 @@ In the wild:
 - **Varnish** for HTTP-layer caching in front of origin servers.
 - **CDNs** — Cloudflare, Fastly, CloudFront, Akamai — for geographically distributed edge caching, with native SWR and stale-if-error semantics.
 - **AWS ElastiCache**, **GCP Memorystore**, **Azure Cache for Redis** as the managed offerings.
-- **Facebook TAO** layered a graph-aware cache over MySQL and used a *leases* mechanism — give exactly one client a lease to populate a missed key; others wait — to control stampedes at scale.
+- **Facebook's memcache deployment** uses a *leases* mechanism — on a miss the cache hands one client a lease token to populate the key; concurrent missers wait or accept a stale value — to control stampedes at scale (Nishtala et al., NSDI 2013). **Facebook TAO** is a separate system: a graph cache over MySQL with a write-through, regional-leader model, not the leases mechanism.
 - **Netflix EVCache** is a multi-region Memcached-derived cache designed for AWS, with cross-region replication and tunable consistency.
 
 Probes:
