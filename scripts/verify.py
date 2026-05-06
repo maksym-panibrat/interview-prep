@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """Structural linter for topic markdown files.
 
-Checks:
-1. All 9 required sections are present (heading match).
-2. Every ```python code block parses as valid Python 3.
-3. Every internal markdown link resolves to an existing file.
+Two schemas, dispatched by directory:
+- topics/system-design/<file>.md → 5-section refresher schema
+  (TL;DR / How it works / When to use / Trade-offs and failure modes /
+   Real-world and interviewer probes)
+- everything else under topics/  → 9-section algorithm schema
+  (TL;DR / Intuition / Walkthrough / Implementation / Variants & pitfalls /
+   Complexity / Problem set / Related patterns / Interviewer follow-ups)
+
+Both schemas additionally enforce:
+- Every ```python code block parses as valid Python 3.
+- Every internal markdown link resolves to an existing file.
 
 Usage:
     python scripts/verify.py                       # verify all topic files
@@ -20,7 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TOPICS = ROOT / "topics"
 
-REQUIRED_SECTIONS = [
+ALGORITHM_SECTIONS = [
     "TL;DR",
     "Intuition",
     "Walkthrough",
@@ -32,13 +39,30 @@ REQUIRED_SECTIONS = [
     "Interviewer follow-ups",
 ]
 
+SYSTEM_DESIGN_SECTIONS = [
+    "TL;DR",
+    "How it works",
+    "When to use",
+    "Trade-offs and failure modes",
+    "Real-world and interviewer probes",
+]
+
 PYTHON_BLOCK_RE = re.compile(r"```python[^\n]*\n(.*?)```", re.DOTALL)
 LINK_RE = re.compile(r"(?<!!)\]\(([^)]+)\)")
 
 
-def check_sections(text: str) -> list[str]:
+def schema_for(path: Path) -> list[str]:
+    # Dispatch by path component so the function works for both real repo
+    # paths (topics/system-design/...) and temporary test paths
+    # (tmp_path/topics/system-design/...).
+    if "system-design" in path.resolve().parts:
+        return SYSTEM_DESIGN_SECTIONS
+    return ALGORITHM_SECTIONS
+
+
+def check_sections(text: str, sections: list[str]) -> list[str]:
     errors = []
-    for section in REQUIRED_SECTIONS:
+    for section in sections:
         pattern = rf"^#{{1,4}}\s+(?:\d+\.\s+)?{re.escape(section)}\s*$"
         if not re.search(pattern, text, re.MULTILINE):
             errors.append(f"missing section '{section}'")
@@ -74,7 +98,7 @@ def check_links(path: Path, text: str) -> list[str]:
 def verify_file(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8")
     errors = []
-    errors.extend(check_sections(text))
+    errors.extend(check_sections(text, schema_for(path)))
     errors.extend(check_python_blocks(text))
     errors.extend(check_links(path, text))
     return [f"{path}: {e}" for e in errors]
