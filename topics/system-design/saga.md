@@ -88,7 +88,7 @@ Anti-signals:
 
 ## 5. Real-world and interviewer probes
 
-In the wild, **AWS Step Functions** is the dominant managed orchestration service on AWS, with compensation via `Catch` blocks. **Temporal** (and its predecessor **Cadence**, originally built at Uber and powering most of Uber's workflows) is the heavyweight durable orchestration engine: workflows are code, every step is a durable checkpoint, the runtime survives process failures transparently. **Netflix Conductor** and **Camunda** (BPMN) cover the same ground. Lighter-weight: a service-owned orchestrator on a database state table plus the outbox for command publication. Choreography-only sagas are common in smaller event-driven systems on Kafka.
+In the wild, **AWS Step Functions** is the dominant managed orchestration service on AWS, with compensation via `Catch` blocks. **Temporal** (forked from Uber's **Cadence** in 2019 by its original creators after they left Uber; both engines remain in active use, with Cadence still powering workflows at Uber) is the heavyweight durable orchestration engine: workflows are code, every step is a durable checkpoint, the runtime survives process failures transparently. **Netflix Conductor** and **Camunda** (BPMN) cover the same ground. Lighter-weight: a service-owned orchestrator on a database state table plus the outbox for command publication. Choreography-only sagas are common in smaller event-driven systems on Kafka.
 
 Probes you should expect:
 
