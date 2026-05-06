@@ -26,7 +26,7 @@ Query "dave"   -> {3, 9, 14} any 0 -> "no"     (true negative)
 
 `carol` was never inserted, but her three bits were set by `alice` and `bob` together. That is the false-positive event.
 
-For `n` inserted keys, the false-positive rate is approximately `p ≈ (1 - e^{-kn/m})^k`. Optimal sizing for target `p` at expected cardinality `n`: `m = -n · ln(p) / (ln 2)^2` bits and `k = (m/n) · ln 2` hash functions. A 1% rate at `n = 10M` takes about 12 MB and `k = 7`; cutting `p` to 0.1% roughly doubles the memory.
+For `n` inserted keys, the false-positive rate is approximately `p ≈ (1 - e^{-kn/m})^k`. Optimal sizing for target `p` at expected cardinality `n`: `m = -n · ln(p) / (ln 2)^2` bits and `k = (m/n) · ln 2` hash functions. A 1% rate at `n = 10M` takes about 12 MB and `k = 7`; cutting `p` to 0.1% adds about 50% more memory (~5 more bits per element, since `m` scales with `−ln p`).
 
 ### Counting Bloom and Cuckoo filters
 
