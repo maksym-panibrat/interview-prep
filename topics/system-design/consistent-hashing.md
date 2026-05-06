@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-Consistent hashing is a hash-sharding scheme that minimizes data movement when nodes are added or removed: only `K/N` keys move when one node joins or leaves an N-node cluster of `K` keys, against `~(N-1)/N` keys with the obvious `hash(key) % N`. You reach for it any time you can't afford a global re-shuffle on capacity changes — distributed caches, Dynamo-style key-value stores, request routing with affinity. The mechanics are a hash ring plus virtual nodes; the failure modes are skew (vanilla consistent hashing is ~2x imbalanced at the tail) and the operational cost of teaching every client about ring membership.
+Consistent hashing is a hash-sharding scheme that minimizes data movement when nodes are added or removed: only `K/N` keys move when one node joins or leaves an N-node cluster of `K` keys, against `~(N-1)/N` keys with the obvious `hash(key) % N`. You reach for it any time you can't afford a global re-shuffle on capacity changes — distributed caches, Dynamo-style key-value stores, request routing with affinity. The mechanics are a hash ring plus virtual nodes; the failure modes are skew (without enough vnodes, ~2x tail skew is the asymptotic bound; 100–256 vnodes per node typically pull it down to ~1.1–1.3x) and the operational cost of teaching every client about ring membership.
 
 ## 2. How it works
 
@@ -43,7 +43,7 @@ For a replication factor of R, the R nodes clockwise from a key's position own i
 
 ### Bounded loads
 
-Vanilla consistent hashing, even with vnodes, can show up to ~2x imbalance at the tail — there is some node that owns roughly twice the average load. Google's "Consistent Hashing with Bounded Loads" (Mirrorball, 2016) caps load per node at `(1 + epsilon)` times the average: when a key would land on a node already at the cap, the key skips clockwise to the next under-cap node. The cost is a per-key probe and bookkeeping; the benefit is provable load balance. Used in Vimeo's haproxy LB and elsewhere when tail skew matters.
+Vanilla consistent hashing, even with vnodes, can show up to ~2x imbalance at the tail — there is some node that owns roughly twice the average load. Mirny et al. (2016), "Consistent Hashing with Bounded Loads", caps load per node at `(1 + epsilon)` times the average: when a key would land on a node already at the cap, the key skips clockwise to the next under-cap node. The cost is a per-key probe and bookkeeping; the benefit is provable load balance. Vimeo's haproxy implementation is the canonical real-world adoption when tail skew matters.
 
 ## 3. When to use
 
@@ -84,4 +84,4 @@ Probes:
 - *"What fraction of keys move when one node is added?"* — `~1/N` for the (N+1)th node. With `hash(key) % N`, almost every key moves because `% N` and `% (N+1)` are unrelated partitions. That ratio is the entire reason consistent hashing exists.
 - *"What's the worst-case load skew?"* — Vanilla consistent hashing with a moderate vnode count peaks at ~2x average load at the tail. "Consistent hashing with bounded loads" caps load per node at `(1 + epsilon)` times the average by walking clockwise past any node already at the cap.
 - *"How do replicas work?"* — The next R nodes clockwise own replicas, with skip rules so two replicas don't land on the same physical node or the same rack. The first owner is the coordinator for that key. Combined with R/W quorums where `R + W > N`, this is the placement substrate for tunable-consistency stores.
-- *"4 nodes with `hash % 4`, you add a 5th — what happens?"* — Almost every key gets reassigned, because the modular partition for `% 4` and `% 5` agrees on roughly `1/20` of keys. With consistent hashing, only the keys in the new node's arc — about `1/5` — move. That's the difference between a several-hour rebalance and a several-day one.
+- *"4 nodes with `hash % 4`, you add a 5th — what happens?"* — Almost every key gets reassigned, because `hash % 4` and `hash % 5` partition the key space differently and only a small fraction happen to keep the same owner. With consistent hashing, only the keys in the new node's arc — about `1/5` — move. That's the difference between a several-hour rebalance and a several-day one.
