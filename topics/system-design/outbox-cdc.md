@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-You need to mutate a row and publish an event about that mutation, atomically. Your DB does transactions; your message broker isn't enrolled in them, so the obvious code — write the row, then publish — has two failure modes that both corrupt the world. The **transactional outbox** removes the second write by recording the event *inside the same DB transaction* as the business change, then ships it out-of-band. **Change data capture (CDC)** takes that further: the DB's own write-ahead log becomes the event source, and a connector like Debezium turns committed rows into broker messages with no extra app code. You trade exactly-once delivery for at-least-once with idempotent consumers, and accept some operational weight in exchange for never losing or fabricating events again.
+You need to mutate a row and publish an event about that mutation, atomically. Your DB does transactions; your message broker isn't enrolled in them, so the obvious code — write the row, then publish — corrupts the world in both orderings (lost events on one side, phantom events on the other). The **transactional outbox** collapses the publish into a second row written inside the same DB transaction as the business change, then ships it out-of-band. **Change data capture (CDC)** takes that further: the DB's own write-ahead log becomes the event source, and a connector like Debezium turns committed rows into broker messages with no extra app code. **The pipeline is at-least-once; consumers must be idempotent** — the price for never losing or fabricating events again, plus some operational weight (Kafka Connect, replication slots, an unbounded table that needs pruning).
 
 ## 2. How it works
 
@@ -15,12 +15,12 @@ COMMIT;
 kafka.send("OrderPlaced", {id: 123});
 ```
 
-Two things can go wrong, and one of them eventually will:
+Two failure orderings, both eventually fatal:
 
-- **Commit then publish, publish fails.** The DB says yes; the broker times out or the process crashes in the window between `COMMIT` returning and the producer receiving an ack. The order is placed, no one downstream knows. Inventory never decrements; the email never sends. Retrying on process restart requires you to remember what to retry — which is the outbox, just badly implemented in memory.
-- **Publish then commit, commit fails.** You moved the publish first; the broker accepted the event, then the txn rolled back (deadlock, constraint violation, connection drop before `COMMIT`). The broker now holds an event for an order that does not exist. Downstream services act on a phantom; there is no "unsend" on Kafka.
+- **Commit-then-publish, publish fails.** `COMMIT` returns, the order is durable; the process is killed (or the broker is unreachable) before `kafka.send` acks. **Order exists in the DB, no event ever flows.** Inventory never decrements, the email never sends, the warehouse never picks. Retrying on process restart means remembering what to retry — which is an outbox, just implemented badly in memory and lost on the next crash.
+- **Publish-then-commit, commit fails.** You move the publish before `COMMIT`; the broker accepts the record, then the txn rolls back (deadlock victim, FK violation, connection drop, lock timeout). **The broker now holds an event for an order that does not exist.** Downstream services act on a phantom: shipping label printed for nothing, customer charged for an order the DB never recorded. Kafka has no "unsend."
 
-No ordering of the two writes is safe — the broker isn't in the DB transaction, and 2PC between Kafka and Postgres is not a real product. You need a different shape.
+No reordering of the two writes is safe — the broker isn't enrolled in the DB transaction, and **2PC between Kafka and Postgres is not a real product** (XA was abandoned by Kafka by design). You need a different shape.
 
 ### Outbox table
 
@@ -65,7 +65,7 @@ loop forever:
       UPDATE outbox_events SET published_at=now() WHERE id=row.id;
 ```
 
-Semantics are **at-least-once**: if the relay crashes between `broker.send` and the UPDATE, the next iteration re-publishes. Consumers must dedup. The partial index above keeps the poll query cheap as the table grows.
+Semantics are **at-least-once**: if the relay crashes between `broker.send` and the UPDATE, the next iteration re-publishes the row. Consumers dedup on event ID. The partial index keeps each poll cheap regardless of table size — see *Hot outbox* below for why a full index would be a mistake.
 
 ### CDC
 
@@ -109,11 +109,11 @@ Anti-signals:
 
 - **At-least-once, not exactly-once.** Relay and CDC both re-deliver after a crash that landed the broker write but missed the ack. Consumers must be [idempotent](idempotency.md) — same discipline as any retry-prone path.
 - **Outbox table grows unboundedly** if the relay or CDC connector falls behind, or if you forget to prune. A background job that deletes published rows older than N hours is non-optional; without it every business write touches a multi-million-row table.
-- **Hot outbox.** Every business transaction also writes the outbox row. The relay's poll query must hit the partial index on `published_at IS NULL`, not scan the whole table.
+- **Hot outbox.** Every business transaction now writes a second row, and a poll relay scans the table for unpublished work every interval. **A full B-tree index on `published_at` is the wrong tool**: 99.9%+ of rows are already published and waste index pages, every insert pays full WAL cost on a multi-gigabyte index, and the "find unpublished" lookup still scans most of the index in published-heavy tables. **Use a partial index — `WHERE published_at IS NULL`.** It contains only in-flight rows (typically dozens to thousands), the poll query becomes an index range scan over a tiny structure, and writes pay WAL cost for the partial index only when inserting (`published_at` defaults to NULL) or when the relay flips it (`NULL → now()` removes from the index). Combined with a pruning job, the index stays small forever.
 - **CDC operational cost is real.** Debezium drags in Kafka Connect, often a schema registry, and replication-slot management. Engineers need to know what a slot is and how to monitor lag.
-- **Replication-slot leak (Postgres).** A logical slot whose consumer stops advancing pins WAL forever — Postgres will not recycle beyond the oldest slot's `restart_lsn`. Disk fills, the database goes read-only, on-call learns about slots the hard way. Alert on `pg_replication_slots.confirmed_flush_lsn` lag, and on PG 13+ set **`max_slot_wal_keep_size`** as the safety knob: the slot is invalidated (and the disk saved) once retained WAL exceeds that bound, at the cost of forcing a Debezium re-snapshot.
+- **Replication-slot leak (Postgres).** A logical slot whose consumer stops advancing pins WAL forever — **Postgres refuses to recycle WAL beyond the oldest slot's `restart_lsn`**. The chain runs to the end: Debezium dies or its Connect task is paused → slot's `confirmed_flush_lsn` stops moving → WAL accumulates in `pg_wal/` at the full write rate of the primary → **disk fills → the database refuses writes and crashes (or goes read-only)**. The blast radius is the entire database, not just the consumer. Alert on `pg_replication_slots.confirmed_flush_lsn` lag (LSN distance, not just time), and on **PG 13+ set `max_slot_wal_keep_size`**: once retained WAL exceeds that bound, Postgres **invalidates the slot before it kills the disk**, trading a forced Debezium re-snapshot for a live database.
 - **WAL retention must outlive CDC downtime.** Conversely, if `max_slot_wal_keep_size` (or your archive retention) is tighter than your worst-case Debezium outage, the slot's required WAL is gone and the connector cannot resume without a snapshot. Size it against your incident response SLA, not your average uptime.
-- **Schema coupling.** Publish raw row-change events and every consumer pins to your table schema; renaming a column becomes a cross-team migration. Publish *semantic* events (`OrderPlaced`, payload is your contract), not `INSERT INTO orders`. The outbox row is your event-shape boundary.
+- **Schema coupling.** If you skip the outbox SMT and publish raw `orders`-table CDC events, **every consumer is now coupled to your table schema**. Pricing reads `total_cents`; analytics joins on `status = 'shipped'`; the email service reads `customer_email`. Add a NOT NULL column with no default and the producing transaction fails until every Avro schema is updated; rename `status → state` and a dozen consumer pipelines break on the same deploy; split `orders` into `orders` + `order_lines` and the wire contract dissolves. **Publish semantic events instead** — `OrderPlaced` with an explicit, versioned payload — so the table is free to evolve and the contract is the JSON schema, not the DDL. **The outbox row is your event-shape boundary**: app code chooses what goes in `payload`, and that is what consumers see.
 - **Single-DB scope.** Outbox gives you atomicity inside one database. Two databases mutating atomically is still the dual-write problem at a larger scale — that is what sagas are for.
 - **Ordering is per-aggregate, not global.** Consumers expecting a single global order across all aggregates will be wrong. Document the partitioning contract.
 
@@ -124,7 +124,7 @@ In the wild, **Debezium** is the dominant open-source CDC connector for Postgres
 Probes you should expect:
 
 - *"Why not just publish to Kafka inside the DB transaction?"* — Kafka isn't enrolled in the DB transaction. Publish before commit and the txn might roll back, leaving a phantom event. Publish after commit and the process can die in between, losing the event. The outbox collapses the publish into a single DB write the txn already covers.
-- *"Why CDC over a polling relay?"* — Lower latency (WAL streams, no poll cycle), no app code change to add new events, preserves DB-level commit ordering for free, and survives app crashes because the publish path doesn't live in the app. Cost is the operational footprint of Debezium and replication slots.
+- *"Why CDC over a polling relay?"* — **Load and latency.** A 100ms-interval poller runs `SELECT ... WHERE published_at IS NULL ... LIMIT 500` ten times a second per shard, every shard, forever — even at 3 a.m. when nothing is being published. The partial index makes each query cheap but never free, and tail latency is bounded below by the poll interval (avg ~50ms, p99 ~100ms). **CDC reads the WAL incrementally** — the database is already writing it, the connector is a follower, and lag is typically sub-second under load with **zero query cost on the primary**. You also get DB-level commit ordering for free (single-writer log) and the publish path stops living in your app, so app crashes can't strand events.
 - *"What about ordering guarantees?"* — Per aggregate, yes: WAL is single-writer-ordered per shard, CDC preserves it, and partition key = aggregate ID maintains it through Kafka. Across aggregates there is no global ordering; that is intentional, because global order would serialize the pipeline.
 - *"How is this different from a saga?"* — Outbox is *delivery* atomicity: the event leaves your service iff the local txn committed. A saga is *business-process* atomicity: a multi-step workflow across services either completes or compensates. They compose — a saga step typically uses outbox to publish its "step done" event.
 - *"What about exactly-once?"* — You don't get it from the pipeline; you get it from the consumer. Outbox + CDC is at-least-once delivery; the consumer dedups on event ID (or on natural idempotency) for exactly-once *effects*.

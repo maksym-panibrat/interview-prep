@@ -31,26 +31,30 @@ For `n` inserted keys, the false-positive rate and the optimal sizing for target
 ```
 p   ≈ (1 - e^{-kn/m})^k
 m   = -n · ln(p) / (ln 2)^2     bits
-k   = (m/n) · ln 2              hash functions
+k   = (m/n) · ln 2 ≈ 0.69 (m/n) hash functions
 ```
 
-A 1% rate at `n = 10M` takes about 12 MB and `k = 7` (~9.6 bits per element). Since `m` scales with `−ln p`, going from 1% to 0.1% multiplies memory by `ln(10⁻³)/ln(10⁻²) = 1.5` — about 50% more, or ~5 extra bits per element. Each further 10× FPR reduction costs another fixed ~5 bits per element, not a doubling.
+Walk it for **10M URLs at 1% FPR**: `m/n ≈ 9.6 bits per element`, so `m ≈ 96 Mb = 12 MB` and `k = 7` hash functions per insert and per lookup. The HashSet alternative — 10M URL strings at ~150 bytes each with object headers and pointers — is **about 1.5 GB**. **Bloom buys you ~100× memory savings**; the price is roughly 1% extra source lookups when the filter says "maybe" but the key is absent. Since `m` scales with `−ln p`, tightening from 1% to 0.1% costs `ln(10⁻³)/ln(10⁻²) = 1.5×` more memory — ~5 extra bits per element. Each further 10× FPR cut adds another fixed ~5 bits, **linear in the log of the rate, not a doubling per nine of accuracy**.
 
 ### Counting Bloom and Cuckoo filters
 
-Vanilla Bloom does not support deletion: clearing a bit could falsify keys that share it. **Counting Bloom** uses small counters (4 bits typical) per slot — insert increments, delete decrements, ~4× the memory. **Cuckoo filter** stores compact fingerprints in a hash table with cuckoo-eviction insertion: supports deletion, beats Bloom on space at low false-positive rates, better cache locality. Trade is operational complexity and a non-trivial high-load failure (see §4).
+**Vanilla Bloom cannot delete.** Clearing the `k` bits for a removed key would also clear bits other inserted keys depend on, turning their lookups into false negatives — and false negatives are the one failure mode Bloom's contract forbids. **Counting Bloom** replaces each bit with a small counter (4 bits is typical): insert increments the `k` slots, delete decrements them, query treats nonzero as set. You pay ~4× the memory, and counter overflow can still wedge a slot at the saturation value if a key is inserted more times than the counter can hold.
+
+**Cuckoo filter** sidesteps deletion by storing **compact fingerprints** (e.g. 8–16 bits, a hash of the key truncated) in a cuckoo hash table with two candidate buckets per key. Insertion places the fingerprint in either bucket; if both are full, it evicts a resident fingerprint to *its* alternate bucket, repeating until a slot opens or a retry budget is hit. **Deletion is just removing the fingerprint** from whichever of the two buckets holds it. At ≤1% FPR Cuckoo beats Bloom on space (around 7 bits/element vs. ~10), gets better cache locality (two bucket probes vs. `k` scattered bits), and supports deletion natively. The catch: **insertion can fail above ~95% load** when an eviction chain exhausts its retry budget — you can't run a Cuckoo to the brim, and a failed insert means resize-and-rebuild.
 
 ### HyperLogLog
 
-Hash each item to a uniformly distributed value and split it into a bucket selector and a tail. Per bucket, track the maximum number of leading zeros seen in its tail. Because hash bits are uniform, a `ρ`-leading-zero prefix is a 1-in-`2^ρ` event, so each bucket's max `ρ` is a noisy estimator of `log2(n/m)` — the cardinality routed to it. The harmonic mean of `2^ρ_j` across buckets, multiplied by `m` and a bias constant `α_m`, gives the cardinality estimate, with relative standard error `~1.04 / √m`.
+Hash each item to a uniformly distributed value and split it into a **bucket selector** (the leading `log2 m` bits) and a **tail**. Per bucket, track the maximum number of leading zeros seen in its tail across all items routed there. Because hash bits are uniform, a `ρ`-leading-zero prefix is a 1-in-`2^ρ` event, so each bucket's max `ρ` is a noisy estimator of `log2(n/m)` — the cardinality routed to it. The harmonic mean of `2^ρ_j` across buckets, scaled by `m` and a bias constant `α_m`, gives the cardinality estimate, with relative standard error `≈ 1.04 / √m`.
 
-Concrete sizing: `m = 2^12 = 4096` buckets at 6 bits each is about **3 KB** and yields **~1.6% relative error**, whether you're counting 10 thousand or 10 billion distinct items. Bumping to `2^14` buckets (~12 KB) cuts the error to ~0.8%.
+Walk it for **counting unique source IPs hitting your service in a day**. With `m = 2^12 = 4096` buckets at 6 bits each, the register array is `4096 × 6 bits ≈ 3 KB`, and the error is `1.04 / √4096 ≈ 1.6%`. Bumping to `m = 2^14 = 16384` buckets gives `≈ 12 KB` for `1.04 / √16384 ≈ 0.8%` error. The startling part: **at 100M distinct IPs, HLL still uses 3 KB**. A HashSet of 100M IPv4-as-strings is **on the order of a gigabyte**; HLL is six orders of magnitude smaller for ~1.6% error, **and the size does not grow with cardinality** — same 3 KB at a thousand IPs or a trillion.
 
 Pure HLL underestimates at small cardinality; **HLL++** (Google, 2013) detects the low-end regime and switches to a linear-counting estimator from the empty-bucket count, hiding the regime change behind one knob. BigQuery and DataSketches implement HLL++ directly; Redis ships a related dense/sparse HLL with its own bias correction. HLL tells you *how many distinct*, not *which ones* — pair with a separate structure if you also need identity.
 
 ### Mergeability — the distributed-systems point
 
-This is why both dominate at scale. **Bloom merge** is bitwise OR of two filters built with the same `m` and `k`, yielding the Bloom of the union. **HLL merge** is elementwise max of two register arrays of the same precision, yielding the HLL of the union. Each shard keeps its own structure locally; ship the fixed-size summary to a coordinator and merge. No re-shuffling, no exact deduplication, no shared state. That is how Redis Cluster computes `PFCOUNT` across keys, how a fleet of edge nodes reports unique visitors hourly without a central database, and how ad-tech systems estimate cross-campaign reach by OR-ing or max-ing per-shard summaries instead of moving the underlying IDs.
+This is the property that makes both indispensable at scale. **Bloom merge is bitwise OR.** Picture 100 shards, each maintaining its own Bloom filter of the keys it stores, all sized to the same `m` and `k`. ORing the 100 bit arrays yields the Bloom filter of the *union* — "is this key in *any* shard?" answered in 12 MB of OR operations, no key movement, no cross-shard fan-out on the read path. **HLL merge is elementwise max** across registers. The same 100 shards each maintain an HLL of their unique visitors; taking the per-bucket max of the 100 register arrays yields the HLL of the global unique-visitor set. **You get distinct-count across shards without ever de-duplicating a single ID across machines** — ship the 3 KB register array, take the max, read cardinality off the merged HLL.
+
+This is how Redis Cluster's `PFCOUNT` works across keys, how edge fleets report hourly unique visitors without a central database, and how ad-tech estimates cross-campaign reach by max-merging per-campaign HLLs instead of moving the underlying IDs.
 
 ## 3. When to use
 

@@ -8,11 +8,11 @@ A **distributed lock** gives one client exclusive access to a resource across ma
 
 ### Lease, not lock
 
-A distributed "lock" is really a **lease**: an exclusive grant with a TTL, renewed before expiry or auto-released. Without the TTL, a crashed holder pins the resource forever.
+A distributed "lock" is really a **lease**: an exclusive grant with a TTL, renewed by the holder before expiry or auto-released by the service when expiry hits. Walk it: process A acquires a lease with TTL 30s. A pings the lock service every 10s to renew, well inside the TTL. A's host crashes. After 30s of no renewal, the service expires the lease on its own. Process B acquires. **No human is in the cleanup path** — failure of the holder is recovered by the passage of time, not by an operator. Drop the TTL and a single crashed holder pins the resource forever.
 
 ### The TTL trap
 
-The lease introduces a timing assumption: the holder checks "do I still hold the lease?" often enough relative to the TTL. That breaks the moment the runtime stops cooperating — a stop-the-world GC pause, a scheduling stall on an over-committed VM, a swapping host. The client wakes up, still believing it holds the lock, and writes. Meanwhile the service has reissued the lease to someone else, who is also writing.
+The lease buys autonomy at the cost of a timing assumption: the holder must notice "I still own this" inside the TTL window. The runtime stops cooperating the moment a stop-the-world GC, a scheduling stall on an over-committed VM, or a swap-thrashing host steals more time than the TTL allows. Walk it: A holds the lease with token `33` and TTL 30s. A enters a 35s GC pause. At t=30 the service expires A's lease and at t=31 grants B a fresh lease with token `34`. B writes. At t=35 A resumes — still convinced it owns the lock, with no in-band signal that anything changed — and writes too. **Both writes succeed at the resource unless something at the resource rejects A.** A network partition between the holder and the service, or a clock jump on the service host, produces the same picture.
 
 ```mermaid
 sequenceDiagram
@@ -33,36 +33,49 @@ sequenceDiagram
     R-->>A: REJECTED (33 < 34)
 ```
 
-A network partition that cuts the holder off from the service, or a clock jump on the service host, produces the same picture. **You cannot use wall-clock time to reason about safety across processes** — time on the holder and time on the service are not the same clock.
+**You cannot use wall-clock time to reason about safety across processes** — time on the holder and time on the service are not the same clock, and TTLs are guesses about pause durations you cannot bound.
 
 ### Fencing tokens
 
-The fix is to stop trusting the holder. Every successful acquisition returns a monotonically increasing **fencing token** — `33`, `34`, `35`, never reused, never decreasing. Every write to the protected resource carries the token; the resource remembers the highest token it has accepted and **rejects any write with a smaller token**. The zombie above writes `33` after the resource has accepted `34`; the resource refuses it. The lock service no longer has to be perfect — the resource is the source of truth for "who is current."
+The fix is to stop trusting the holder and let the resource arbitrate. Every successful acquisition returns a monotonically increasing **fencing token** — `33`, `34`, `35`, never reused, never decreasing. Every write to the protected resource carries the token, and the resource enforces the rule:
 
-The check has to live at the resource, in the same atomic step as the write. A database stores `last_fence` on the row: `UPDATE ... SET ..., last_fence = ? WHERE id = ? AND last_fence < ?`. An object store with conditional writes carries the token as the precondition (S3 `If-Match` on the ETag, GCS `x-goog-if-generation-match`). A plain POSIX filesystem cannot — there is no atomic "check-then-write" against a stored fence — and that is the honest answer to "is a lock for this resource safe?"
+```
+on write(value, incoming_token):
+    if incoming_token >= latest_lock_token:
+        apply(value)
+        latest_lock_token = incoming_token   # atomic with the apply
+    else:
+        reject
+```
+
+Walk the zombie scenario: B writes with `34`, the resource accepts and bumps `latest_lock_token` to `34`. A wakes from its GC pause and writes with `33`. `33 < 34`, **rejected**. **The resource is the source of truth, not the lock service.** The lock service can lose its mind — reissue early, double-grant, partition — and safety still holds, because the only way to corrupt the resource is to present a token at least as large as the one it last accepted, and the lock service's monotonicity guarantees there is at most one such holder at any moment.
+
+The check must live at the resource, atomic with the write. In SQL, that is `UPDATE row SET col = ?, latest_lock_token = ? WHERE id = ? AND ? >= latest_lock_token`; if zero rows are affected, your token is stale. With S3, the token rides in `If-Match` against the object's ETag (or in object-lock conditional headers); GCS uses `x-goog-if-generation-match`. A plain POSIX filesystem has no atomic check-then-write against a stored fence, and that is the honest answer to "is my POSIX-file lock safe?" — **no, because the resource cannot enforce.**
 
 ### Coordination service-backed (etcd, ZooKeeper)
 
-A strongly consistent, [leader-elected store](leader-election-consensus.md). A lock is a key with a lease; clients acquire by creating the key, watch for release, and use the key's `mod_revision` (etcd) or `czxid` (ZooKeeper) as the fencing token. The store's consensus protocol handles failover, lease expiry, and ordering. Correct by construction, a few ms per acquisition within a region. The right answer when correctness matters more than latency.
+A strongly consistent, [leader-elected store](leader-election-consensus.md). A lock is a key with an attached lease; clients acquire by creating the key under the lease, watch for release, and use **the per-acquisition monotonic version the store already produces** as the fencing token — `mod_revision` in etcd, `czxid` in ZooKeeper. The store's consensus protocol handles failover, lease expiry, and ordering, and the version is monotonic by construction across the cluster. **You get a fence for free; you just have to send it.** A few milliseconds per acquisition within a region. The right answer when correctness matters more than latency.
 
 ### Single-Redis with TTL
 
-`SET key value NX PX 30000`. One round trip, microseconds, easy to reason about. Loses correctness on failover because Redis replication is asynchronous: the master acks the `SET` to the client, then crashes before the write reaches the replica; sentinel promotes the replica, which has no record of the lock; a second client `SET NX` succeeds. Two holders, same key, no fencing — and the lock service itself can't tell.
+`SET key value NX PX 30000`. One round trip, microseconds, trivial to reason about — and unsafe on failover because Redis replication is asynchronous. Walk it: client A sends `SET NX`, master accepts, master acks A. Master crashes before the write replicates. Sentinel promotes the replica, which has no record of the lock. Client B sends `SET NX` to the new master, succeeds. **Two holders, same key, neither aware of the other** — split-brain at the lock service. Single-Redis also has **no native fencing token**: you can stuff a UUID into the value to prevent unlock-of-a-stolen-lock (Lua compare-and-delete), but a UUID is not monotonic, so the resource has nothing to compare against. Safe single-Redis locking requires you to mint a fence yourself somewhere monotonic (e.g., a DB sequence), which usually defeats the point of using Redis.
 
 ### Redlock (multi-Redis)
 
-Redlock acquires on a [majority of `N` independent Redis nodes](quorum-consistency.md) within a bounded time window, treating that majority as ownership. Martin Kleppmann's well-known critique has two prongs. First, the timing-assumption problem common to any TTL lock: a long enough holder pause (GC, scheduling stall) lets the lease expire and be reissued before the holder notices — without fencing tokens, you cannot prove safety against the resulting double-write, and Redlock proposes none. Second, the multi-node-specific problem: Redlock's safety argument depends on bounded clock drift across the `N` Redis nodes, since each node's TTL runs on its own clock; a clock jump on one node (NTP step, VM migration) can release that node's slice early and let a quorum re-form for a second client. antirez pushed back on the model — disputing the assumption that clock jumps of the relevant magnitude actually happen on production hosts and arguing the algorithm holds under the threat model Redlock was designed for. Take the lesson, not a side: **fencing tokens are the answer, not which lock service you used.**
+Redlock acquires on a [majority of `N` independent Redis nodes](quorum-consistency.md) within a bounded time window `T`, treating that majority as ownership. The dispute is concrete. **Martin Kleppmann's argument:** Redlock's safety proof assumes the holder cannot pause longer than `T`'s implicit bound; a GC pause or scheduling stall longer than that bound lets the lease expire and be reissued while the holder still thinks it owns the lock. The multi-node majority does not eliminate this — it just adds a second timing assumption (bounded clock drift across the `N` independent nodes, since each node ages its TTL on its own clock). Without fencing tokens, no TTL-based lock is safe under unbounded pauses, and Redlock proposes none. **antirez's pushback:** clock jumps of the relevant magnitude don't happen on healthy production hosts, GC pauses long enough to matter are rare, and Redlock holds under the threat model it was designed for; you can layer fencing on top if you want.
+
+Don't take a side; take the lesson. **The interesting question is not which lock service you picked. It is whether the resource validates fencing tokens.** A correct fence in front of a "wrong" lock service is safe. No fence in front of any lock service — Redis, etcd, Chubby — eventually isn't.
 
 ## 3. When to use
 
 - **Exclusive access to a resource that can validate a fencing token.** DB row, S3 object, lease-aware service — the resource is the source of truth and rejects stale tokens.
-- **Leader election.** Use a coordination service (etcd, ZooKeeper, Consul) and treat the elected leader's session ID as the fence. Reuse correct primitives instead of building one.
+- **Leader election.** Use a coordination service (etcd, ZooKeeper, Consul) and ride its monotonic version (`mod_revision`, `czxid`) as the fence. Reuse correct primitives instead of building one.
 - **Throttling exclusive jobs.** "Only one cron worker runs the nightly batch." Cheap correctness, bounded blast radius.
 - **Workflow gating.** "Only one orchestrator processes this saga at a time" with the saga row as the fence.
 
 Anti-signals:
 
-- **High-throughput per-row contention.** Use **optimistic concurrency control** — a `version` column, `UPDATE ... SET ..., version = version + 1 WHERE id = ? AND version = ?`, retry on conflict. No lock service, no leases, no GC-pause failure mode; throughput limited only by the row's own write rate. Most "we need a distributed lock" requests are this in disguise.
+- **High-throughput per-row contention.** Reach for **optimistic concurrency control**, not a lock. Add a `version` column; on update, `UPDATE row SET col = ?, version = version + 1 WHERE id = ? AND version = ?`. If the `WHERE` matches, you got the row and won the race. If it didn't, someone wrote between your read and your update — re-read and retry. **No lock service, no lease, no GC-pause failure mode; throughput scales with row-level contention, not lock-service capacity.** Most "we need a distributed lock" asks are an OCC problem in disguise.
 - **Resource cannot validate fencing tokens.** The "lock" is advisory. Be honest: redesign the resource, or accept the rare double-write.
 - **Cross-service ordering, not exclusion.** That is what a saga or an idempotency key is for.
 
