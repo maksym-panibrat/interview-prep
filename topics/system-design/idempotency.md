@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-An operation is **idempotent** if executing it N times produces the same effect as executing it once. Retries are inevitable — load balancers retry, queues redeliver, clients refresh, humans double-click — so every state-mutating endpoint needs an idempotency story or it will charge cards twice and send duplicate emails. The "exactly-once delivery" myth dies here: across an unreliable network you cannot guarantee a message arrives exactly once, but you *can* guarantee **exactly-once effects** by combining at-least-once delivery with server-side dedup.
+An operation is **idempotent** if executing it N times produces the same effect as executing it once. [Retries](resilience-four-pack.md) are inevitable — load balancers retry, queues redeliver, clients refresh, humans double-click — so every state-mutating endpoint needs an idempotency story or it will charge cards twice and send duplicate emails. The "exactly-once delivery" myth dies here: across an unreliable network you cannot guarantee a message arrives exactly once, but you *can* guarantee **exactly-once effects** by combining at-least-once delivery with server-side dedup.
 
 ## 2. How it works
 
@@ -66,7 +66,7 @@ How far back you remember keys. Shorter = cheaper storage, higher chance a legit
 ## 3. When to use
 
 - **Any HTTP endpoint behind a load balancer.** Most LBs retry on connection errors; the server cannot tell a fresh request from a replay.
-- **Any queue consumer.** SQS, Kafka, RabbitMQ — at-least-once is the default; the consumer owns dedup.
+- **Any queue consumer.** SQS, Kafka, RabbitMQ — [at-least-once is the default](pubsub-semantics.md); the consumer owns dedup.
 - **Webhook receivers.** The sender retries on any non-2xx, including timeouts. Design for duplicates from day one.
 - **Cross-service writes** in microservices, where a supervisor retries a saga step after the caller crashes mid-flight.
 
@@ -100,4 +100,4 @@ Anti-signals:
 - *"How long should the dedup window be?"* — Bounded by the realistic retry horizon: client retry policy, queue redelivery timer, mobile reconnect window. Minutes to hours. Days only with a specific business reason and the storage budget.
 - *"Why is 'exactly-once delivery' a myth?"* — The sender cannot distinguish "message lost" from "ack lost" without an extra round trip, which can also be lost. Achievable: exactly-once **effects** = at-least-once delivery + idempotent processing.
 - *"Walk me through implementing it for a payment endpoint."* — Caller sends `Idempotency-Key`. Server opens a transaction, `INSERT` into a unique-constrained `idempotency_keys` table; on conflict, return the existing row's stored response. On fresh insert, perform the charge in the same transaction (or via two-phase if the gateway is external), store the response on the key row, commit. Same key + different body → 409.
-- *"Where does this break?"* — When the side effect crosses a boundary the dedup row cannot cover transactionally (external API, second database, bus). Mitigation is the two-phase reserve/confirm plus a reconciler — there is no free atomic commit across heterogeneous systems.
+- *"Where does this break?"* — When the side effect crosses a boundary the dedup row cannot cover transactionally (external API, second database, bus). Mitigation is the two-phase reserve/confirm plus a reconciler, or the [transactional outbox](outbox-cdc.md) when the second write is a published event — there is no free atomic commit across heterogeneous systems.

@@ -88,7 +88,7 @@ Confluent's "outbox event router" SMT (single-message transform) reshapes raw `o
 
 ### Ordering
 
-Per-aggregate order is what you usually want — `OrderPlaced` before `OrderShipped` for the same order. Set the Kafka partition key to the aggregate ID (`order:123`) and per-partition FIFO carries that ordering end-to-end. Across aggregates there is no global order, and that is the right trade for throughput.
+Per-aggregate order is what you usually want — `OrderPlaced` before `OrderShipped` for the same order. Set the [Kafka partition key](pubsub-semantics.md) to the aggregate ID (`order:123`) and per-partition FIFO carries that ordering end-to-end. Across aggregates there is no global order, and that is the right trade for throughput.
 
 ## 3. When to use
 
@@ -101,11 +101,11 @@ Anti-signals:
 
 - Pure read paths. Nothing to publish.
 - Synchronous request/response where the caller needs the downstream effect before the response returns. Outbox is asynchronous; use a direct call.
-- Workflows where eventual delivery is unacceptable and you need an explicit success/compensate handshake. Use a saga (which often uses outbox underneath but adds orchestration on top).
+- Workflows where eventual delivery is unacceptable and you need an explicit success/compensate handshake. Use a [saga](saga.md) (which often uses outbox underneath but adds orchestration on top).
 
 ## 4. Trade-offs and failure modes
 
-- **At-least-once, not exactly-once.** Relay and CDC both re-deliver after a crash that landed the broker write but missed the ack. Consumers must be idempotent — same discipline as any retry-prone path.
+- **At-least-once, not exactly-once.** Relay and CDC both re-deliver after a crash that landed the broker write but missed the ack. Consumers must be [idempotent](idempotency.md) — same discipline as any retry-prone path.
 - **Outbox table grows unboundedly** if the relay or CDC connector falls behind, or if you forget to prune. A background job that deletes published rows older than N hours is non-optional; without it every business write touches a multi-million-row table.
 - **Hot outbox.** Every business transaction also writes the outbox row. The relay's poll query must hit the partial index on `published_at IS NULL`, not scan the whole table.
 - **CDC operational cost is real.** Debezium drags in Kafka Connect, often a schema registry, and replication-slot management. Engineers need to know what a slot is and how to monitor lag.

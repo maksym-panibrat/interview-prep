@@ -35,7 +35,7 @@ Multiple nodes accept writes — typically one leader per region — and replica
 
 ### Leaderless (Dynamo-style)
 
-There is no leader. The client (or a coordinator) writes to **N** replicas and reads from a quorum; success requires **W** acks on write and **R** on read, with `W + R > N` for quorum overlap. Replicas reconcile via **read repair**, **anti-entropy** (Merkle-tree sweeps), and **hinted handoff** (a peer holds writes for a temporarily unreachable node and replays them on recovery). Cassandra and DynamoDB are the canonical examples. Highly available — any node can take a write — but consistency is weak unless quorums are tuned, and even then not linearizable. Quorum mechanics get their own depth in `quorum-consistency.md`.
+There is no leader. The client (or a coordinator) writes to **N** replicas and reads from a quorum; success requires **W** acks on write and **R** on read, with `W + R > N` for [quorum overlap](quorum-consistency.md). Replicas reconcile via **read repair**, **anti-entropy** (Merkle-tree sweeps), and **hinted handoff** (a peer holds writes for a temporarily unreachable node and replays them on recovery). Cassandra and DynamoDB are the canonical examples. Highly available — any node can take a write — but consistency is weak unless quorums are tuned, and even then not linearizable.
 
 ### Synchronous vs asynchronous vs semi-synchronous
 
@@ -60,7 +60,7 @@ semi-sync:  client -> leader -> follower(s)
 
 When the leader fails, the cluster must detect the failure, elect a new leader, and route writes to it. Detection is timeout-based and inherently ambiguous — "slow" and "dead" look identical from outside. Promote too eagerly and the old leader returns to find a new one has accepted conflicting writes: **split brain**. Two leaders, both convinced they own the cluster, divergence guaranteed.
 
-Defenses are **quorum-based leader election** (a majority must agree, so two leaders cannot both have a majority — Raft and Paxos; depth in `leader-election-consensus.md`), **fencing tokens** (each new leader gets a monotonically increasing token, replicas reject writes from a stale one), and **STONITH** ("shoot the other node in the head" — physically power off or network-isolate the old leader before promoting a new one).
+Defenses are [**quorum-based leader election**](leader-election-consensus.md) (a majority must agree, so two leaders cannot both have a majority — Raft and Paxos), **fencing tokens** (each new leader gets a monotonically increasing token, replicas reject writes from a stale one), and **STONITH** ("shoot the other node in the head" — physically power off or network-isolate the old leader before promoting a new one).
 
 ### Replication lag
 

@@ -51,7 +51,7 @@ A single gateway instance sees only a fraction of the traffic. To enforce a glob
 
 - **Public API protection from abuse and free-tier overuse** — the canonical case. One scraper should not consume capacity you owe paying customers.
 - **Per-tenant fairness in multi-tenant systems.** A noisy tenant cannot saturate a shared resource if every tenant has its own bucket.
-- **Backpressure source for downstream protection.** When a downstream has a hard capacity (third-party API, single-writer database, ML inference cluster), the rate limiter is what keeps you under that ceiling.
+- [**Backpressure**](backpressure-load-shedding.md) **source for downstream protection.** When a downstream has a hard capacity (third-party API, single-writer database, ML inference cluster), the rate limiter is what keeps you under that ceiling.
 - **Cost control.** Third-party APIs you pay per call, LLM token budgets, expensive external lookups — rate limiting is the budget enforcement point.
 
 **Anti-signal:** internal RPC between trusted services that scale together. Limiting your own services from each other usually means the wrong circuit in the wrong place — what you want is concurrency limits and a circuit breaker, not a quota. Rate limiting is for *adversarial or unbounded* sources.

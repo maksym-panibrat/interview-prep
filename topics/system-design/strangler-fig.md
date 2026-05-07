@@ -51,7 +51,7 @@ Flip the routing rule for the slice: the facade now serves it from the new syste
 
 If the data lived in the legacy database, decide who owns the write path during and after the slice cuts over. Three common shapes:
 
-- **New owns writes; legacy reads via CDC** until legacy callers are also migrated.
+- **New owns writes; legacy reads via [CDC](outbox-cdc.md)** until legacy callers are also migrated.
 - **Legacy owns writes; new reads via CDC** — useful when you can't yet trust new on the write path.
 - **Dual-write.** Both systems write, one is declared source of truth. Simple to describe, painful to operate — the two writes can disagree and the reconciliation logic is its own subsystem. CDC-driven flows are usually safer.
 
@@ -79,7 +79,7 @@ Anti-signals:
 - **Routing logic complexity grows.** The facade's "legacy or new?" rules accumulate per slice, per tenant, per region. Without discipline to delete rules as slices stabilize, the facade becomes a second legacy.
 - **Forgotten dead code in legacy.** "We cut over years ago but the old code is still here, and no one's sure what calls it." The most common strangler failure: the decommission step is implicit and gets deprioritized the moment the new system works. Budget it explicitly — calendar it, assign it, treat it as part of "done."
 - **Behavioral drift.** Old assumptions baked into legacy (timezone defaults, null vs empty string, rounding modes, undocumented sort order) won't be replicated unless you find them. Shadow comparisons are how you find them; do not skip shadowing because the new system "looks right."
-- **Schema coupling.** If both systems share a database, schema changes affect both, and you can't truly migrate. A meaningful strangler usually has to include a database split — as a prerequisite or as part of the slice work.
+- [**Schema coupling**](schema-evolution.md)**.** If both systems share a database, schema changes affect both, and you can't truly migrate. A meaningful strangler usually has to include a database split — as a prerequisite or as part of the slice work.
 - **Rollback cost.** If you cut over and roll back, in-flight writes to the new system may be lost or have to be reconciled to the legacy store. Each slice needs an explicit rollback plan: where do the in-flight writes go, and is loss acceptable?
 
 ## 5. Real-world and interviewer probes

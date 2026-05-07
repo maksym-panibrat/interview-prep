@@ -82,9 +82,9 @@ The cost of carrying old branches is real but bounded; the cost of *not* carryin
 ## 3. When to use
 
 - Any persisted data with a non-trivial lifetime — months, years. Database tables, event logs, archived blobs, anything restored from backup.
-- Any pub/sub stream with independent producers and consumers, especially across team boundaries.
+- Any [pub/sub stream](pubsub-semantics.md) with independent producers and consumers, especially across team boundaries.
 - Any cross-team API where versions coexist on the wire — public APIs, internal RPCs, anything where "stop the world and upgrade everyone at once" isn't an option.
-- Any system that supports replay or projection rebuilds — CQRS read-side rebuilds force you to handle every historical event format.
+- Any system that supports replay or projection rebuilds — [CQRS read-side rebuilds](cqrs-read-models.md) force you to handle every historical event format.
 
 Anti-signals:
 

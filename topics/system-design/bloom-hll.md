@@ -46,7 +46,7 @@ This is why both dominate at scale. **Bloom merge** is bitwise OR of two filters
 
 ## 3. When to use
 
-Reach for a **Bloom filter** in front of an expensive lookup ("is this key on disk / in this SSTable / in the remote cache?" — let the filter answer "no" cheaply, only pay the I/O when it says "maybe"), to filter repeated queries for keys you've already proven absent, for set-membership over a feed you don't store ("have I emitted this URL today?"), or for a giant denylist compressed to a few hundred KB you can ship to every client.
+Reach for a **Bloom filter** in front of an expensive lookup ("is this key on disk / in this SSTable / in the [remote cache](caching.md)?" — let the filter answer "no" cheaply, only pay the I/O when it says "maybe"), to filter repeated queries for keys you've already proven absent, for set-membership over a feed you don't store ("have I emitted this URL today?"), or for a giant denylist compressed to a few hundred KB you can ship to every client.
 
 Reach for **HLL** for unique-X-per-Y at scale (daily unique visitors, distinct queries per tenant, distinct keys touched in a window), A/B cohort sizing, audience reach, cardinality monitoring on event streams, or anywhere `COUNT(DISTINCT ...)` is the slow query and 1–2% error is fine.
 

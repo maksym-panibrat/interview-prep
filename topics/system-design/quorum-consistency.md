@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-Quorum-based replication writes to **W of N** replicas and reads from **R of N**; as long as `R + W > N`, every read set intersects every committed write set on at least one replica, so the latest write is visible. Tuning `R`, `W`, and `N` per request — Dynamo-style "tunable consistency" — is the knob between strong reads, write latency, and availability. The math is simple, the gotchas are not: `R + W > N` is necessary, never sufficient. Concurrent writers, sloppy quorums, and last-write-wins clocks all hand you stale or lost data while the protocol claims success.
+Quorum-based [replication](replication.md) writes to **W of N** replicas and reads from **R of N**; as long as `R + W > N`, every read set intersects every committed write set on at least one replica, so the latest write is visible. Tuning `R`, `W`, and `N` per request — Dynamo-style "tunable consistency" — is the knob between strong reads, write latency, and availability. The math is simple, the gotchas are not: `R + W > N` is necessary, never sufficient. Concurrent writers, sloppy quorums, and last-write-wins clocks all hand you stale or lost data while the protocol claims success.
 
 ## 2. How it works
 
@@ -63,7 +63,7 @@ Quorum overlap tells you a read sees *some* write — not which one wins when tw
 
 Anti-signals:
 
-- **Serializable transactions across keys.** Quorum is per-key. Multi-key invariants — bank transfers, foreign keys, "no two users with the same email" — need a consensus-based store (Spanner, CockroachDB) or an explicit transaction coordinator.
+- **Serializable transactions across keys.** Quorum is per-key. Multi-key invariants — bank transfers, foreign keys, "no two users with the same email" — need a [consensus-based store](leader-election-consensus.md) (Spanner, CockroachDB) or an explicit transaction coordinator.
 - **Strict read-your-writes everywhere.** If every read must see every write, you're paying quorum cost on every read. A leader-based system might be cheaper.
 - **Workloads that can't tolerate hidden data loss.** LWW will eat writes you didn't realize were concurrent. If that's not okay, you're committing to vector clocks or CRDTs.
 

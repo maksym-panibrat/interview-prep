@@ -23,7 +23,7 @@ Range scans are cheap — keys near each other live on the same shard. The price
 
 ### Hash sharding
 
-The shard for a key is `hash(key) mod N`, or equivalently a position on a consistent-hashing ring.
+The shard for a key is `hash(key) mod N`, or equivalently a position on a [consistent-hashing ring](consistent-hashing.md).
 
 ```
 shard(key) = hash(key) % N
@@ -68,7 +68,7 @@ Any query that doesn't carry the shard key has to fan out:
 
 ## 3. When to use
 
-- **Data set too large for one node.** Storage exceeds what one machine holds, or write throughput exceeds what one primary sustains. Read load alone is usually solved with read replicas, not sharding.
+- **Data set too large for one node.** Storage exceeds what one machine holds, or write throughput exceeds what one primary sustains. Read load alone is usually solved with [read replicas](replication.md), not sharding.
 - **Per-tenant isolation.** One tenant per shard — or a whale tenant on its own shard — eliminates the noisy-neighbor mode where one customer's bad query degrades everyone.
 - **Geographic data locality.** Region-affinity sharding keeps EU users' data on EU shards (latency plus residency regimes like GDPR). The shard key is effectively `(region, user_id)`.
 - **Write hotspots a single primary can't absorb.** Time-series ingest, event streams, activity feeds.

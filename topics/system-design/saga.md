@@ -55,7 +55,7 @@ No real locks across services. Services mark resources as **pending** until the 
 
 ### Idempotent steps and compensations
 
-Every step and every compensation gets retried (network, restart, redelivery). Both must be **idempotent** — same `(saga_id, step)` produces the same effect on the second attempt as on the first. Dedup on the step key, store the result, return it on replay.
+Every step and every compensation gets retried (network, restart, redelivery). Both must be [**idempotent**](idempotency.md) — same `(saga_id, step)` produces the same effect on the second attempt as on the first. Dedup on the step key, store the result, return it on replay.
 
 ### Persistence
 
@@ -81,7 +81,7 @@ Anti-signals:
 - **Compensation chains can fail.** A `RefundCard` the processor rejects leaves the saga half-compensated. Compensations must be idempotent, retried with backoff, and escalated to a human queue when retries exhaust — a refund the bank refuses is a person's problem.
 - **Choreography has no central state.** "Where did this saga get stuck?" becomes a distributed-tracing problem across N services. Orchestration trades coupling for one place to look.
 - **Orchestrator is a SPOF if not HA.** Replicate it and persist state, or a single instance crashing mid-saga loses the workflow.
-- **Step delivery is a delivery-atomicity problem.** The orchestrator must publish "do step N" reliably even if it crashes mid-publish — the dual-write problem. The answer is the transactional outbox: persist the state transition and outbound command in one DB transaction, ship via CDC or a relay, dedup on `(saga_id, step)` at the handler.
+- **Step delivery is a delivery-atomicity problem.** The orchestrator must publish "do step N" reliably even if it crashes mid-publish — the dual-write problem. The answer is the [transactional outbox](outbox-cdc.md): persist the state transition and outbound command in one DB transaction, ship via CDC or a relay, dedup on `(saga_id, step)` at the handler.
 - **2PC is a smell, not an alternative.** XA holds resource locks for the saga's duration (potentially hours), doesn't survive participant failure cleanly (in-doubt transactions strand DB locks for operators), throughput collapses, and third-party APIs don't speak XA anyway. Sagas trade isolation for liveness — the right trade in essentially every microservices context.
 - **Timeouts.** Every step needs a timeout and defined timeout behavior (usually "treat as failure, compensate"); without it a stuck step hangs the saga forever.
 - **Versioning long-running sagas.** A three-day saga may outlive a deploy that changes its step set. Either version sagas (V1 sagas finish on V1 code) or keep step changes backward compatible. Temporal makes this explicit; hand-rolled orchestrators discover it the hard way.

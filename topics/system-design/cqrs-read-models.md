@@ -24,14 +24,14 @@ queries --------+-------------------------------+-------------------------------
 
 ### Projections
 
-A **projection** is a consumer that reads the event stream and updates a read store. It is a pure function of `(current read state, event) -> new read state`, with two non-negotiable properties:
+A **projection** is a consumer that reads the [event stream](pubsub-semantics.md) and updates a read store. It is a pure function of `(current read state, event) -> new read state`, with two non-negotiable properties:
 
 - **Idempotent.** Same event delivered twice produces the same read state. Track the last-applied event offset per projection; ignore replays of older offsets.
 - **Replayable.** Re-running from offset zero against an empty read store reaches the same final state.
 
 ### Replay — the killer feature
 
-Replay is what justifies most of the cost. Bug in a projection that mis-counted refunds for two months? Truncate, reset the offset to zero, replay. Want a new read model — "orders by customer ZIP" — that nobody asked for at launch? Spin up a fresh projection on the same stream, catch up, switch reads over. No re-querying the write store, no backfill. The event log already contains every fact; the new projection is just a new function over it. The read store is a cache.
+Replay is what justifies most of the cost. Bug in a projection that mis-counted refunds for two months? Truncate, reset the offset to zero, replay. Want a new read model — "orders by customer ZIP" — that nobody asked for at launch? Spin up a fresh projection on the same stream, catch up, switch reads over. No re-querying the write store, no backfill. The event log already contains every fact; the new projection is just a new function over it. The read store is a [cache](caching.md).
 
 ### Event sourcing (the variant)
 
@@ -53,14 +53,14 @@ Event sourcing is a separate cost decision *on top of* CQRS. CQRS without event 
 Anti-signals:
 
 - **Plain CRUD with read/write parity.** If reads are "show me the row I just wrote," CQRS is overhead with no payoff.
-- **Strong consistency required between write and read.** CQRS is asynchronous — the read side trails by at least the projection lag. If "the next read after a write must reflect that write," handle read-your-writes explicitly (sticky-route to write, optimistic UI), don't paper it with a read-model lookup.
+- **Strong consistency required between write and read.** CQRS is asynchronous — the read side trails by at least the projection lag, the same shape as [replication lag against a follower](replication.md). If "the next read after a write must reflect that write," handle read-your-writes explicitly (sticky-route to write, optimistic UI), don't paper it with a read-model lookup.
 - **Small teams on small systems.** Two stores, an event pipeline, and projection monitoring is real operational weight; a single Postgres serves a startup for years.
 
 ## 4. Trade-offs and failure modes
 
 - **Eventual consistency between write and read.** The headline cost. The write commits, the read store hasn't projected yet, the next page load shows stale state. UX has to handle it: optimistic updates that show new state immediately and reconcile on refresh, "your change will appear shortly" copy where reconcile is too complex, or session-affinity read-your-writes against the write store. Pretending the lag doesn't exist is the most common production failure mode.
 - **Replay cost grows with event count.** A clean replay of a year-old log can take hours to days. Snapshotting (periodic dumps of read state plus offset) cuts cold-replay dramatically; without it, projection recovery is a real outage metric. Test replay regularly — a path nobody has run in two years no longer works.
-- **Event schemas are permanent.** Old events live forever; every projection must handle every historical version. You add new event shapes, never delete. Versioning discipline (additive changes, version field, upcasters from v1 into v2 on read) is non-optional.
+- **Event schemas are permanent.** Old events live forever; every projection must handle every historical version. You add new event shapes, never delete. [Versioning discipline](schema-evolution.md) (additive changes, version field, upcasters from v1 into v2 on read) is non-optional.
 - **Projection bugs require replay.** Truncate, fix, replay — cheap when small, painful at scale. Any "fast fix that patches the read store directly" rots the replay invariant: the next replay reverts the patch and the bug is back.
 - **Operational complexity.** Multiple stores, an event pipeline (Kafka, outbox + CDC), projection workers, snapshot jobs, offset tracking, lag monitoring, replay tooling. Make sure the read-shape divergence justifies that surface.
 - **Event sourcing's specific tax.** Every change is an event; ad-hoc DB fixes are not available. Migrations are events (an `OrderCorrected` event, not an `UPDATE`). No admin tool changes a row because there is no row to change. Loading current state pays the fold cost, partially solved by snapshots but never fully.

@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-**Consensus** protocols — Raft, Paxos, Multi-Paxos, EPaxos — let a cluster agree on a single value (or single ordered log of values) despite crashes, slow links, and partitions. **Leader election** is the most common building block on top: agreeing "who's in charge" so operations can be serialized through one node. The engineering question is whether you actually need consensus at all. Every commit costs a majority round trip and pins a single leader as the throughput ceiling, so reach for it only when one ordering of events is a hard requirement; workloads that tolerate eventual consistency should skip the tax and use quorum replication instead.
+**Consensus** protocols — Raft, Paxos, Multi-Paxos, EPaxos — let a cluster agree on a single value (or single ordered log of values) despite crashes, slow links, and partitions. **Leader election** is the most common building block on top: agreeing "who's in charge" so operations can be serialized through one node. The engineering question is whether you actually need consensus at all. Every commit costs a majority round trip and pins a single leader as the throughput ceiling, so reach for it only when one ordering of events is a hard requirement; workloads that tolerate eventual consistency should skip the tax and use [quorum replication](quorum-consistency.md) instead.
 
 ## 2. How it works
 
@@ -51,7 +51,7 @@ A cluster of `N` tolerates `⌊N/2⌋` failures and needs `⌊N/2⌋ + 1` for an
 
 Reach for consensus when:
 
-- **You need a single coordinator.** Sequencer for global IDs, lock service, primary in a primary-replica DB, current-leader-of-shard. Leader election is the cheapest correct way.
+- **You need a single coordinator.** Sequencer for global IDs, [lock service](distributed-locks.md), primary in a primary-replica DB, current-leader-of-shard. Leader election is the cheapest correct way.
 - **You need strongly consistent metadata.** Cluster membership, configuration, schema, feature flags that must never diverge. Small data, low write rate — a perfect fit.
 - **You need a replicated log / state machine.** Every replica applies the same operations in the same order. etcd, ZooKeeper, KRaft, the per-range groups in CockroachDB and Spanner.
 - **You need linearizable reads.** Route reads through the leader's log or use leader leases.

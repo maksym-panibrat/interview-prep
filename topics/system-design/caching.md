@@ -34,7 +34,7 @@ Every cached value has an expiry. The naive design — fixed TTL, populate on mi
 
 - **Stale-while-revalidate (SWR).** On a request that finds an expired-but-still-present value, serve the stale value immediately and refresh the cache asynchronously. The user sees no latency hit; the source sees one refresh per stale-window, not one per request. HTTP `Cache-Control: stale-while-revalidate` standardizes this; CDNs implement it natively.
 
-- **Negative caching.** Cache "not found" results too — with a *short* TTL. Without it, every request for a missing key is a guaranteed source hit; with a 30s negative TTL you cap the damage from a popular missing key (misconfigured client, deleted record someone is still polling) at a manageable miss-storm.
+- **Negative caching.** Cache "not found" results too — with a *short* TTL. Without it, every request for a missing key is a guaranteed source hit; with a 30s negative TTL you cap the damage from a popular missing key (misconfigured client, deleted record someone is still polling) at a manageable miss-storm. A [Bloom filter](bloom-hll.md) is the fixed-memory variant for the same job — answer "definitely absent" cheaply before paying the source lookup.
 
 - **Probabilistic early refresh.** As a key's age approaches its TTL, each read has a small randomized probability of triggering an early refresh. The XFetch algorithm formalizes this: probability rises from 0 toward 1 as `t -> ttl`. Hot keys get refreshed before they expire, with no synchronized expiry event.
 
@@ -43,7 +43,7 @@ Jittered TTL plus single-flight plus SWR is the bread-and-butter combination.
 ## 3. When to use
 
 - **Read-heavy workloads** with low write rate or tolerable staleness. Classic shape: 1000:1 read-to-write, a 60-second tolerance for stale data, an obvious 10x speedup.
-- **Expensive computations or downstream calls** — slow database queries, search index fan-outs, LLM inferences, third-party APIs you pay per call for. Anything where computing the value costs much more than storing it.
+- **Expensive computations or downstream calls** — slow database queries, search index fan-outs, LLM inferences, third-party APIs you pay per call for. Anything where computing the value costs much more than storing it. When the "expensive computation" is a denormalized join you keep recomputing, the right shape is often a [materialized read model](cqrs-read-models.md), not a cache.
 - **Geographically distant calls.** A CDN in front of static assets, a regional cache in front of a single-region origin. The cache exists to absorb the speed of light.
 - **Smoothing bursty load.** If the source can serve steady-state QPS but not peaks, a cache absorbs the spikes.
 

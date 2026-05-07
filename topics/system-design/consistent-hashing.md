@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-Consistent hashing is a hash-sharding scheme that minimizes data movement when nodes are added or removed: only `K/N` keys move when one node joins or leaves an N-node cluster of `K` keys, against `~(N-1)/N` keys with the obvious `hash(key) % N`. You reach for it any time you can't afford a global re-shuffle on capacity changes — distributed caches, Dynamo-style key-value stores, request routing with affinity. The mechanics are a hash ring plus virtual nodes; the failure modes are skew (without enough vnodes, ~2x tail skew is the asymptotic bound; 100–256 vnodes per node typically pull it down to ~1.1–1.3x) and the operational cost of teaching every client about ring membership.
+Consistent hashing is a [hash-sharding scheme](sharding.md) that minimizes data movement when nodes are added or removed: only `K/N` keys move when one node joins or leaves an N-node cluster of `K` keys, against `~(N-1)/N` keys with the obvious `hash(key) % N`. You reach for it any time you can't afford a global re-shuffle on capacity changes — distributed caches, Dynamo-style key-value stores, request routing with affinity. The mechanics are a hash ring plus virtual nodes; the failure modes are skew (without enough vnodes, ~2x tail skew is the asymptotic bound; 100–256 vnodes per node typically pull it down to ~1.1–1.3x) and the operational cost of teaching every client about ring membership.
 
 ## 2. How it works
 
@@ -39,7 +39,7 @@ The fix is virtual nodes (vnodes): each physical node owns many ring positions, 
 
 ### Replication
 
-For a replication factor of R, the R nodes clockwise from a key's position own its replicas. The first owner is the *coordinator* for that key. With vnodes you must take care to skip vnodes belonging to a physical node that already holds a replica — otherwise R replicas can land on the same machine. Rack-aware and AZ-aware variants extend the skip rule to spread replicas across failure domains. Dynamo-style stores combine this layout with quorum reads and writes (`R + W > N`) for tunable consistency; the consistent-hashing ring is the placement substrate underneath.
+For a replication factor of R, the R nodes clockwise from a key's position own its replicas. The first owner is the *coordinator* for that key. With vnodes you must take care to skip vnodes belonging to a physical node that already holds a replica — otherwise R replicas can land on the same machine. Rack-aware and AZ-aware variants extend the skip rule to spread replicas across failure domains. Dynamo-style stores combine this layout with [quorum reads and writes](quorum-consistency.md) (`R + W > N`) for tunable consistency; the consistent-hashing ring is the placement substrate underneath.
 
 ### Bounded loads
 

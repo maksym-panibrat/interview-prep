@@ -16,7 +16,7 @@ Metrics are aggregates over time. Three frameworks cover almost every case, comp
 - **USE** (per resource — CPU, disk, queue, pool): **U**tilization, **S**aturation, **E**rrors. The internal-capacity view.
 - **Four Golden Signals** (Google SRE): **latency, traffic, errors, saturation.** A superset of RED with saturation; the canonical answer if an interviewer asks for one framework.
 
-Aggregation rule: **histograms over averages.** An average hides the tail; a histogram lets you compute p50/p95/p99/p99.9 directly. The interesting failure modes (GC pauses, slow downstreams, queue backups) live at p99 and above, invisible in the mean.
+Aggregation rule: **histograms over averages.** An average hides the tail; a histogram lets you compute p50/p95/p99/p99.9 directly. The interesting failure modes (GC pauses, [slow downstreams](resilience-four-pack.md), queue backups) live at p99 and above, invisible in the mean.
 
 ### Structured logging
 

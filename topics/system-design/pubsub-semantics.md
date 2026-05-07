@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-Pub/sub is the easy part: producers publish to a topic, consumers subscribe, the broker decouples them. The hard part — the part every team learns by losing or duplicating production messages — is the operational semantics on top: delivery guarantees, ordering boundaries, replay, rebalances, poison messages. The single most useful framing to carry into an interview is that **"exactly-once delivery" is a marketing term**. Across an unreliable network, the achievable property is at-least-once delivery plus idempotent consumers, which together produce exactly-once *effects*. Every other failure mode in this section is a corollary of that fact.
+Pub/sub is the easy part: producers publish to a topic, consumers subscribe, the broker decouples them. The hard part — the part every team learns by losing or duplicating production messages — is the operational semantics on top: delivery guarantees, ordering boundaries, replay, rebalances, poison messages. The single most useful framing to carry into an interview is that **"exactly-once delivery" is a marketing term**. Across an unreliable network, the achievable property is at-least-once delivery plus [idempotent consumers](idempotency.md), which together produce exactly-once *effects*. Every other failure mode in this section is a corollary of that fact.
 
 ## 2. How it works
 
@@ -55,7 +55,7 @@ Because the partitioned log retains history (Kafka by retention policy; SQS does
 - Decoupled service-to-service notification, where the publisher does not know or care who consumes. Adding a consumer is a deployment, not a producer change.
 - Fan-out: one event drives many independent consumers — emails, projections, search indexing, audit, analytics — each in its own group at its own pace.
 - Burst absorption. The broker buffers traffic the consumers cannot keep up with, and the lag drains when the spike ends. The producer is no longer coupled to the slowest consumer.
-- Event-driven architectures. Combined with the outbox pattern or CDC, pub/sub becomes a reliable spine for state propagation across services.
+- Event-driven architectures. Combined with [the outbox pattern or CDC](outbox-cdc.md), pub/sub becomes a reliable spine for state propagation across services.
 
 Anti-signals:
 
@@ -68,9 +68,9 @@ Anti-signals:
 - **Duplicates are routine, not rare.** At-least-once means redelivery on every crash, network blip, or commit-before-broker-ack race. Consumer idempotency is not a nice-to-have; it is the contract.
 - **Ordering is per-partition only.** Cross-partition ordering does not exist, by design. If your business invariant requires "event A before event B," they must share a partition key — usually because they share an aggregate.
 - **Rebalance pauses.** When a consumer joins, leaves, or fails its heartbeat, the group rebalances: all consumers pause, partitions are reassigned, processing resumes. Frequent rebalances — caused by consumer churn, slow processing exceeding `max.poll.interval.ms`, or autoscaling thrash — are a scaling killer. Tune heartbeat and poll intervals; use sticky/cooperative rebalance protocols where the broker supports them.
-- **Slow consumer = backlog growth.** Consumer lag (broker offset minus committed offset) is the canary. When it grows monotonically, you are losing ground. Remedies: parallelize within a partition (only safe if processing is per-message, not per-key sequence), repartition the topic, or scale out the consumer group up to the partition count — not beyond, because extra consumers sit idle.
+- **Slow consumer = backlog growth.** Consumer lag (broker offset minus committed offset) is the canary — the [backpressure](backpressure-load-shedding.md) signal of a partitioned log. When it grows monotonically, you are losing ground. Remedies: parallelize within a partition (only safe if processing is per-message, not per-key sequence), repartition the topic, or scale out the consumer group up to the partition count — not beyond, because extra consumers sit idle.
 - **Poison messages.** One unprocessable message at the head of a partition blocks every message behind it. Bounded retries with exponential backoff, then DLQ. Without DLQ, the consumer loops forever and the partition stalls.
-- **Schema evolution.** Producers and consumers deploy independently, so backward-compatibility on the wire is non-negotiable. Use a schema registry plus Protobuf or Avro; treat field removal as a breaking change; never reuse a field number.
+- [**Schema evolution**](schema-evolution.md)**.** Producers and consumers deploy independently, so backward-compatibility on the wire is non-negotiable. Use a schema registry plus Protobuf or Avro; treat field removal as a breaking change; never reuse a field number.
 - **The "exactly-once" myth.** Repeated deliberately because every team rediscovers it. If a vendor sells exactly-once delivery, they mean exactly-once within their own system under specific configuration — a transactional producer that fences zombies, a transactional consumer reading committed records, both inside the same broker. The moment your consumer writes to an external database, an HTTP API, or a different broker, you are back to at-least-once and idempotency is the answer.
 
 ## 5. Real-world and interviewer probes

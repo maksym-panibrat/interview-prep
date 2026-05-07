@@ -21,7 +21,7 @@ Same pattern every time: **bounded buffer + a way to tell upstream "I'm full"**.
 
 When you cannot push back — public APIs, multi-tenant platforms, anything where the producer is "the internet" — you drop.
 
-- **Admission control at the ingress.** Decide on arrival, before allocating expensive resources. A `503` returned after auth, body parse, and worker queue has burned the capacity you were trying to save.
+- **Admission control at the ingress.** Decide on arrival, before allocating expensive resources. A `503` returned after auth, body parse, and worker queue has burned the capacity you were trying to save. Pair with a [rate limiter](rate-limiting.md) that caps per-tenant flow before any of this runs.
 - **Priority-aware shedding.** Tag requests by priority (paying vs. free, interactive vs. batch, retry vs. fresh) and drop low priority first. Without priority, shedding is a tax on every customer equally — including the ones whose SLOs you're paid to keep.
 - **Adaptive shedding.** Don't shed at a static threshold; probe. Lower the admission rate when latency rises, raise it when latency recovers — same control loop as TCP congestion control.
 
@@ -62,12 +62,12 @@ arrival rate
 - **Any service with non-uniform downstream latency.** When one slow dependency can starve a shared thread pool, you need either a bulkhead or backpressure-plus-shedding (deliberate drop instead of accidental queue-up).
 - **Public APIs with paying-customer SLOs under burst load.** Free-tier traffic should shed first; the platform should degrade along the priority axis you defined, not randomly along the axis the OS chose.
 
-**Anti-signal:** synchronous request/response with a hard SLA. There the right answer is fast failure — tight timeout plus circuit breaker — not a queue you can shed from. If the call has 200 ms to complete or it's worthless, queueing for 50 ms and then maybe shedding is theatre.
+**Anti-signal:** synchronous request/response with a hard SLA. There the right answer is fast failure — tight timeout plus circuit breaker, the [resilience four-pack](resilience-four-pack.md) — not a queue you can shed from. If the call has 200 ms to complete or it's worthless, queueing for 50 ms and then maybe shedding is theatre.
 
 ## 4. Trade-offs and failure modes
 
 - **No backpressure → unbounded queue.** Memory grows until OOM; latency grows until work is stale before the consumer reaches it; recovery requires draining a backlog that may take hours. By the time you notice, the buffered work is already useless.
-- **Drop vs. block trade-off.** Blocking pushes the problem upstream — fine if the upstream can also shed, catastrophic if it just queues harder. Dropping localizes the problem but only works if the dropped work is **recoverable** (idempotent retry, durable source like Kafka with consumer offsets) or genuinely losable (telemetry samples, impression pings).
+- **Drop vs. block trade-off.** Blocking pushes the problem upstream — fine if the upstream can also shed, catastrophic if it just queues harder. Dropping localizes the problem but only works if the dropped work is **recoverable** (idempotent retry, durable source like [Kafka with consumer offsets](pubsub-semantics.md)) or genuinely losable (telemetry samples, impression pings).
 - **Priority shedding requires a fairness model.** Naive "drop low priority first" starves low-priority traffic completely under sustained overload. Use weighted fair queueing or a reservation floor so low-priority customers see degraded service, not zero service.
 - **Cascading shed.** If every layer sheds 20% independently, you drop roughly 49% end-to-end when the signal warranted 20%. **Shed at the edge** and let downstream layers backpressure rather than re-shed.
 - **Hidden queues at every layer.** OS socket buffers, NIC ring buffers, NGINX worker queues, library-internal channels, the kernel's runqueue. Each adds latency invisibly and breaks the assumption that "my service queue is empty, so we're healthy." The classic symptom: queue-depth metric is zero but p99 is 4 seconds — the work is queued somewhere else.

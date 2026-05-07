@@ -38,7 +38,7 @@ The resource must support the check. A database stores `last_fence` on the row: 
 
 ### Coordination service-backed (etcd, ZooKeeper)
 
-A strongly consistent, leader-elected store. A lock is a key with a lease; clients acquire by creating the key, watch for release, and use the key's `mod_revision` (etcd) or `czxid` (ZooKeeper) as the fencing token. The store's consensus protocol handles failover, lease expiry, and ordering. Correct by construction, a few ms per acquisition within a region. The right answer when correctness matters more than latency.
+A strongly consistent, [leader-elected store](leader-election-consensus.md). A lock is a key with a lease; clients acquire by creating the key, watch for release, and use the key's `mod_revision` (etcd) or `czxid` (ZooKeeper) as the fencing token. The store's consensus protocol handles failover, lease expiry, and ordering. Correct by construction, a few ms per acquisition within a region. The right answer when correctness matters more than latency.
 
 ### Single-Redis with TTL
 
@@ -46,7 +46,7 @@ A strongly consistent, leader-elected store. A lock is a key with a lease; clien
 
 ### Redlock (multi-Redis)
 
-Redlock acquires on a majority of `N` independent Redis nodes within a bounded time window, treating that majority as ownership. Martin Kleppmann's well-known critique: Redlock relies on bounded clock drift and bounded GC pauses across those nodes — a long enough holder pause violates safety **even when every node operated correctly** — and without fencing tokens no claimed safety property is provable. Redis's antirez defended the algorithm under different threat models. Take the lesson, not a side: **fencing tokens are the answer, not which lock service you used.**
+Redlock acquires on a [majority of `N` independent Redis nodes](quorum-consistency.md) within a bounded time window, treating that majority as ownership. Martin Kleppmann's well-known critique: Redlock relies on bounded clock drift and bounded GC pauses across those nodes — a long enough holder pause violates safety **even when every node operated correctly** — and without fencing tokens no claimed safety property is provable. Redis's antirez defended the algorithm under different threat models. Take the lesson, not a side: **fencing tokens are the answer, not which lock service you used.**
 
 ## 3. When to use
 

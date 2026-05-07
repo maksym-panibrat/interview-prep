@@ -38,7 +38,7 @@ A three-state machine in front of the dependency:
      +-----probe succeeds-----------+------probe fails-------------+
 ```
 
-Trip on either error rate (`> 50% errors over the last 20 calls`) or latency (`p99 > 2 s for 30 s`). While **open**, the breaker fails fast — no socket, no work, immediate error so the caller's threads aren't held hostage. After a cooldown, move to **half-open** and allow exactly one probe: success closes, failure re-opens. The window is rolling, and you need enough volume in it to be statistically meaningful — a 100% failure rate over 2 calls is noise.
+Trip on either error rate (`> 50% errors over the last 20 calls`) or latency (`p99 > 2 s for 30 s`). While **open**, the breaker fails fast — no socket, no work, immediate error so the caller's threads aren't held hostage. This is [load shedding](backpressure-load-shedding.md) on a per-dependency axis: drop work the dependency can't absorb instead of letting it pile up in the caller. After a cooldown, move to **half-open** and allow exactly one probe: success closes, failure re-opens. The window is rolling, and you need enough volume in it to be statistically meaningful — a 100% failure rate over 2 calls is noise.
 
 ### Bulkhead
 
@@ -56,9 +56,9 @@ Anti-signal: **pure in-process function calls**. A timeout on `parse_json(s)` is
 
 ## 4. Trade-offs and failure modes
 
-- **Retry without idempotency → duplicate side effects.** First attempt charged the card, response was lost, retry charges the card again. Idempotency keys (or natural idempotency on the server) are the prerequisite for retrying any non-GET. See also: idempotency.
+- **Retry without idempotency → duplicate side effects.** First attempt charged the card, response was lost, retry charges the card again. Idempotency keys (or natural idempotency on the server) are the prerequisite for retrying any non-GET. See also: [idempotency](idempotency.md).
 - **Retry without a circuit breaker → retry storm.** Dependency degrades, every caller retries 3×, dependency now sees 4× its normal load and degrades further. The breaker converts "retry on transient failure" into "stop retrying once it's clearly not transient."
-- **Circuit breaker on weak metrics → false-positive trips.** A 2-call window opens during normal dips. Absolute count instead of rate opens during deploy traffic spikes. Threshold tuning is empirical; instrument open/close events as first-class signals.
+- **Circuit breaker on weak metrics → false-positive trips.** A 2-call window opens during normal dips. Absolute count instead of rate opens during deploy traffic spikes. Threshold tuning is empirical; instrument open/close events as first-class [observability](observability-trio.md) signals.
 - **Bulkhead too small → head-of-line blocking.** A 5-permit semaphore on a dependency that normally serves 50 RPS means 45 callers per second wait, even when it's healthy.
 - **Bulkhead too large → no isolation.** A 500-permit pool in a service with 600 worker threads gives almost no protection.
 - **Timeouts without deadline propagation → zombie work.** Edge times out at 1 s and returns 504. Three hops down, a service is still computing the result, holding a DB transaction open, consuming a connection — for a request nobody is listening to.
