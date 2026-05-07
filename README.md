@@ -64,6 +64,59 @@ A long-term, high-quality reference for LeetCode-style algorithm interviews. Eac
 38. [Tarjan's & Kosaraju's (SCC)](topics/nice-to-have/tarjan-kosaraju.md)
 39. [Boyer-Moore Majority Vote](topics/nice-to-have/boyer-moore.md)
 
+## System Design
+
+A senior-level refresher of the patterns that show up in almost any non-trivial production system. Single-tier core; grouped by the problem they solve, not by perceived difficulty. See `docs/superpowers/specs/2026-05-05-system-design-refresher-design.md` for the inclusion criteria.
+
+**Reliable service-to-service communication**
+
+- [Resilience four-pack](topics/system-design/resilience-four-pack.md)
+- [Idempotency](topics/system-design/idempotency.md)
+- [Backpressure & load shedding](topics/system-design/backpressure-load-shedding.md)
+
+**Reliable data flow across services**
+
+- [Transactional outbox + CDC](topics/system-design/outbox-cdc.md)
+- [Saga pattern](topics/system-design/saga.md)
+
+**Scaling reads**
+
+- [Caching strategies & stampede mitigation](topics/system-design/caching.md)
+- [CQRS + materialized read models](topics/system-design/cqrs-read-models.md)
+
+**Data distribution & write scaling**
+
+- [Sharding strategies](topics/system-design/sharding.md)
+- [Consistent hashing](topics/system-design/consistent-hashing.md)
+- [Replication models](topics/system-design/replication.md)
+- [Quorum & tunable consistency](topics/system-design/quorum-consistency.md)
+
+**Coordination**
+
+- [Leader election & consensus](topics/system-design/leader-election-consensus.md)
+- [Distributed locks done right](topics/system-design/distributed-locks.md)
+
+**Throttling & fairness**
+
+- [Rate limiting](topics/system-design/rate-limiting.md)
+
+**Event-driven plumbing**
+
+- [Pub/sub semantics](topics/system-design/pubsub-semantics.md)
+
+**Probabilistic structures at scale**
+
+- [Bloom filters & HyperLogLog](topics/system-design/bloom-hll.md)
+
+**Evolution in production**
+
+- [Schema evolution & backward compatibility](topics/system-design/schema-evolution.md)
+- [Strangler fig](topics/system-design/strangler-fig.md)
+
+**Production observability**
+
+- [Golden signals + tracing trio](topics/system-design/observability-trio.md)
+
 ## See also
 
 - [`RECALL.md`](RECALL.md) — consolidated 30-second cards (TL;DR + Template per topic)
