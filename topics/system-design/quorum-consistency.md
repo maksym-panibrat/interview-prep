@@ -17,18 +17,17 @@ Pick three numbers per keyspace (or per request, on Cassandra and DynamoDB):
 The invariant is `R + W > N`. Pigeonhole: any `W`-set and any `R`-set drawn from the same `N` must overlap on at least one node. That overlapping replica saw the latest committed write, so the read sees it (taking the highest-version response).
 
 ```
-        N = 5 replicas       W = 3   R = 3   (R + W = 6 > 5)
+N = 5 replicas {A, B, C, D, E}, W = 3, R = 3   (R + W = 6 > 5)
 
-        write set:   [ A  B  C  .  . ]
-        read  set:   [ .  B  C  D  . ]   <- overlap on B and C
-                            ^^^^^
-                            latest write visible
+write set = {A, B, C}
+read  set = {B, C, D}
+overlap   = {B, C}   <- at least one node has the latest committed write
 ```
 
 Common knobs:
 
-- `W = N, R = 1` — strong reads, slow writes; any replica down → write unavailable.
-- `W = 1, R = N` — fast writes, slow reads; rarely useful.
+- `W = N, R = 1` — every replica converges before a write acks, so any single replica answers the read with the latest value. Cheap reads; write latency tracks the slowest replica and any replica down takes writes offline.
+- `W = 1, R = N` — every read polls every replica; one ack commits a write. High read latency, low write durability (a single ack can be lost if that node fails before propagation). Rarely useful.
 - `W = R = ⌈(N+1)/2⌉` — balanced strong; the typical "QUORUM" preset.
 - `W = R = 1` — eventual consistency, max availability; reads can be stale.
 
@@ -44,7 +43,7 @@ If a target replica is unreachable when a write arrives, the coordinator stores 
 
 ### Sloppy quorum
 
-When too many *preferred* replicas are unreachable to reach `W`, **strict quorum** fails the write, while **sloppy quorum** writes to *any* `W` healthy nodes — even ones that don't normally own this key — and hands off later. You keep accepting writes during a partition, but those nodes aren't in the actual replica set, so a strict reader can miss them. The consistency guarantee weakens to eventually consistent, even though you nominally configured `R + W > N`.
+When too many *preferred* replicas are unreachable to reach `W`, **strict quorum** fails the write, while **sloppy quorum** walks past the preferred replicas to the next healthy nodes on the ring, accepts the write there with a hint, and hands off later. You keep accepting writes during a partition, but those acks came from nodes outside the key's actual replica set — a strict-quorum reader of the *preferred* `N` can miss them until handoff completes. The guarantee weakens to eventually consistent, even though you nominally configured `R + W > N`.
 
 ### Conflict resolution
 

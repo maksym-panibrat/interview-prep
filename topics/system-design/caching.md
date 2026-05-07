@@ -10,11 +10,11 @@ A cache sits between the reader and the source of truth, holding recently or fre
 
 ### Cache-aside (lazy loading)
 
-The application talks to both layers. On a read it checks the cache; on a miss it reads the source and writes the result back. On a write it updates the source and either invalidates or updates the cache. Simple, explicit, the most common shape in the wild. Downside: cache and source drift on writes, and every miss pays a full source read before the cache warms.
+The application owns miss handling. On a read it checks the cache; on a miss the application reads the source and writes the result back. On a write it updates the source and either invalidates or updates the cache. Simple, explicit, the most common shape in the wild. Downside: cache and source drift on writes, and every miss pays a full source read before the cache warms. Each call site is responsible for its own stampede protection.
 
 ### Read-through
 
-The cache library owns the read path. The application calls `cache.get(key)` and the cache, on miss, fetches from the source itself and populates. Cleaner abstraction and a natural place to centralize stampede protection. Costs: you give up direct control of the source query, and the cache becomes a hard dependency on the read path.
+The cache library or proxy owns miss handling. The application calls `cache.get(key)` and the library, on miss, invokes a registered loader and populates the entry — the application never sees the miss. Cleaner abstraction and the natural place to centralize single-flight, jitter, and SWR for every caller. Costs: you depend on a library that does the right thing under contention, and the cache becomes a hard dependency on the read path.
 
 ### Write-through
 
@@ -22,7 +22,7 @@ Writes go to the cache and the source synchronously, in the same call. Consisten
 
 ### Write-back (write-behind)
 
-Writes go to the cache only; a background worker flushes to the source asynchronously. The fastest write path you can build. Durability and consistency risk: a cache crash before flush loses writes. Reasonable for high-volume telemetry or counters; dangerous as the default for anything you bill on.
+Writes go to the cache only and the client is acknowledged immediately; a background worker flushes to the source asynchronously. The fastest write path you can build. Durability and consistency risk: any acknowledged write that has not yet been flushed is lost if the cache node crashes, the process OOMs, or the eviction policy reclaims the dirty entry — and the client has no way to know. The exposure window is `flush_interval + flush_queue_depth / drain_rate`. Reasonable for high-volume telemetry or counters where a few seconds of loss is tolerable; dangerous as the default for anything you bill on.
 
 ### TTL and stampede mitigation
 
@@ -36,7 +36,7 @@ Every cached value has an expiry. The naive design — fixed TTL, populate on mi
 
 - **Negative caching.** Cache "not found" results too — with a *short* TTL. Without it, every request for a missing key is a guaranteed source hit; with a 30s negative TTL you cap the damage from a popular missing key (misconfigured client, deleted record someone is still polling) at a manageable miss-storm. A [Bloom filter](bloom-hll.md) is the fixed-memory variant for the same job — answer "definitely absent" cheaply before paying the source lookup.
 
-- **Probabilistic early refresh.** As a key's age approaches its TTL, each read has a small randomized probability of triggering an early refresh. The XFetch algorithm formalizes this: probability rises from 0 toward 1 as `t -> ttl`. Hot keys get refreshed before they expire, with no synchronized expiry event.
+- **Probabilistic early refresh.** As a key's age approaches its TTL, each read has a small randomized probability of triggering an early refresh. The XFetch algorithm (Vattani, Chierichetti, Lowenstein, 2015) formalizes this — on each read, recompute if `now - delta * beta * ln(rand()) >= expiry`, where `delta` is the measured recompute cost, `beta` is a tunable aggressiveness factor (typically 1), and `rand()` draws from `(0, 1)`. Since `ln(rand())` is negative, the LHS exceeds `now`, and the probability of triggering rises smoothly toward 1 as `now` approaches `expiry`. Hot keys get refreshed by exactly one reader before they expire, with no synchronized expiry event.
 
 Jittered TTL plus single-flight plus SWR is the bread-and-butter combination.
 

@@ -28,23 +28,28 @@ sleep = random_uniform(0, base * 2 ** attempt)
 
 Decorrelated jitter (`sleep = random(base, prev_sleep * 3)`, capped) is the AWS variant; full jitter is simpler and nearly as good. Bound the attempts (2–4) and bound total time across attempts so you respect the deadline.
 
+Per-call attempt limits are the local guard. The system-level guard is a **retry budget**: cap retries to a fixed fraction (Envoy and Google SRE both use ~10%) of the success RPS over a rolling window. When a dependency degrades, every call wants to retry, multiplying load exactly when it's least welcome — the budget makes retries cheap during normal operation and effectively zero when failures are widespread, even before the circuit breaker trips.
+
 ### Circuit breaker
 
 A three-state machine in front of the dependency:
 
-```
-   CLOSED  --threshold tripped-->  OPEN  --cooldown elapsed-->  HALF-OPEN
-     ^                              |                              |
-     +-----probe succeeds-----------+------probe fails-------------+
+```mermaid
+stateDiagram-v2
+    [*] --> Closed
+    Closed --> Open: error rate / latency<br/>threshold breached
+    Open --> HalfOpen: cooldown elapsed
+    HalfOpen --> Closed: probe succeeds
+    HalfOpen --> Open: probe fails<br/>(reset cooldown)
 ```
 
-Trip on either error rate (`> 50% errors over the last 20 calls`) or latency (`p99 > 2 s for 30 s`). While **open**, the breaker fails fast — no socket, no work, immediate error so the caller's threads aren't held hostage. This is [load shedding](backpressure-load-shedding.md) on a per-dependency axis: drop work the dependency can't absorb instead of letting it pile up in the caller. After a cooldown, move to **half-open** and allow exactly one probe: success closes, failure re-opens. The window is rolling, and you need enough volume in it to be statistically meaningful — a 100% failure rate over 2 calls is noise.
+Trip on error rate (`> 50% errors over the last 20 calls`) or latency (`p99 > 2 s for 30 s`), but only after a **minimum request volume** in the window — resilience4j calls it `minimumNumberOfCalls`, Envoy gates outlier ejection on `enforcing_consecutive_5xx`. Without that floor, a 100% failure rate over 2 calls trips the breaker during quiet periods and you spend the cooldown returning errors for no reason. While **open**, the breaker fails fast — no socket, no work, immediate error so the caller's threads aren't held hostage. This is [load shedding](backpressure-load-shedding.md) on a per-dependency axis: drop work the dependency can't absorb instead of letting it pile up in the caller. After a cooldown, move to **half-open** and allow exactly one probe (or a small ratio of traffic): success closes, failure re-opens with the cooldown reset.
 
 ### Bulkhead
 
-Borrowed from ship design: partition resources so a flood in one compartment doesn't sink the ship. In code: per-dependency **isolated pools** — separate thread pools, connection pools, or semaphores — so a slow dependency only exhausts its own slots.
+Borrowed from ship design: partition resources so a flood in one compartment doesn't sink the ship. In code: per-dependency **isolated pools** — separate thread pools (Hystrix's original choice, gives you a thread boundary for free), connection pools, or counting semaphores (resilience4j's default; cheaper, no extra context switch but no isolation from the caller's stack).
 
-A handler that calls payments, search, and recommendations holds three semaphores of, say, 50 / 100 / 30 permits. When recommendations slows from 50 ms to 5 s, only its 30 permits fill up; payments and search keep flowing. Without bulkheads, all 200 worker threads block on recommendations and the whole service stops accepting work — including healthy traffic for unrelated endpoints.
+A handler that calls payments, search, and recommendations gates each with a separate semaphore — say, 50 / 100 / 30 permits, picked from each dependency's `concurrent_requests = RPS × p99_latency` plus headroom. When recommendations slows from 50 ms to 5 s, only its 30 permits fill up; the next caller fails fast. Payments and search keep flowing because they hold permits from different counters. Without bulkheads, every in-flight request to a slow dependency holds a worker thread, and a service with 200 workers and one bad dependency stops accepting work for everyone — including healthy traffic for unrelated endpoints.
 
 ## 3. When to use
 
@@ -66,7 +71,7 @@ Anti-signal: **pure in-process function calls**. A timeout on `parse_json(s)` is
 
 ## 5. Real-world and interviewer probes
 
-**In the wild.** Netflix Hystrix popularized the four-pack as a single library; it's now in maintenance mode and the modern equivalents are **resilience4j** (JVM), **Polly** (.NET), and language-native primitives — gRPC deadlines, Go `context.Context`, Python `asyncio.timeout`. **Envoy** implements bulkheading via per-cluster connection limits and circuit-breaker-style outlier detection (eject a backend after N consecutive 5xx). **AWS SDKs** ship with jittered exponential backoff on by default — that's why `boto3` "just works" against a flaky DynamoDB. Service meshes (Istio, Linkerd) push the four-pack out of application code into the sidecar.
+**In the wild.** Netflix Hystrix popularized the four-pack as a single library and has been in maintenance mode since 2018; the modern equivalents are **resilience4j** (JVM, lightweight, Hystrix's spiritual successor), **Polly** (.NET), and language-native primitives — gRPC deadlines, Go `context.Context`, Python `asyncio.timeout`. **Envoy** implements bulkheading via per-cluster connection limits, circuit-breaker-style outlier detection (eject a backend after N consecutive 5xx), and a first-class retry budget. **AWS SDKs** ship with jittered exponential backoff on by default — that's why `boto3` "just works" against a flaky DynamoDB. Service meshes (Istio, Linkerd) push the four-pack out of application code into the sidecar, which keeps the policy uniform across languages but makes per-endpoint tuning a YAML problem.
 
 **Probes.**
 

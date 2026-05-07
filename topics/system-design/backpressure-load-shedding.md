@@ -27,7 +27,7 @@ When you cannot push back — public APIs, multi-tenant platforms, anything wher
 
 ### Concurrency limits beat fixed thread pools
 
-A fixed thread pool sized for "normal" load either oversizes (waste) or undersizes (queueing under burst). Netflix's `concurrency-limits` uses an **AIMD** (additive-increase, multiplicative-decrease) controller — like TCP — to auto-tune the in-flight cap: increase while latency is healthy, slash on degradation. The cap converges on actual capacity rather than your guess from six months ago.
+A fixed thread pool sized for "normal" load either oversizes (waste) or undersizes (queueing under burst). Netflix's `concurrency-limits` auto-tunes the in-flight cap from observed latency. Its default algorithms — **Vegas** and **Gradient2** — borrow from TCP Vegas: compare current RTT to the minimum RTT seen, and treat the gap as queueing delay. When delay is small the limit grows; when delay grows the limit contracts. Plain **AIMD** (additive-increase, multiplicative-decrease — same family as TCP Reno's congestion control, due to Van Jacobson, 1988) is also available but reacts only to outright degradation, not the early queue-build signal Vegas catches. The cap converges on actual capacity rather than your guess from six months ago.
 
 ```
 in_flight_limit
@@ -45,15 +45,17 @@ in_flight_limit
 Watch **queue length** and **age-of-oldest-message**, not just throughput. Latency goes nonlinear *before* throughput drops — the queue fills, items wait longer, p99 explodes — but you're still meeting throughput SLO right up to the cliff. Queue depth is the leading indicator.
 
 ```
-arrival rate
+throughput
    ^
    |              ___________
-   |             /           \      throughput
-   |  __________/             \____ stays flat...
+   |             /           \       throughput sits at
+   |  __________/             \____  service capacity...
    |
-   +----------------------------------> time
+   +----------------------------------> offered load
                   ^
-                  | latency p99 already off the chart here
+                  | p99 latency already off the chart here:
+                  | every additional request waits behind the queue,
+                  | but the server is still completing requests at the rate it can.
 ```
 
 ## 3. When to use
@@ -69,7 +71,7 @@ arrival rate
 - **No backpressure → unbounded queue.** Memory grows until OOM; latency grows until work is stale before the consumer reaches it; recovery requires draining a backlog that may take hours. By the time you notice, the buffered work is already useless.
 - **Drop vs. block trade-off.** Blocking pushes the problem upstream — fine if the upstream can also shed, catastrophic if it just queues harder. Dropping localizes the problem but only works if the dropped work is **recoverable** (idempotent retry, durable source like [Kafka with consumer offsets](pubsub-semantics.md)) or genuinely losable (telemetry samples, impression pings).
 - **Priority shedding requires a fairness model.** Naive "drop low priority first" starves low-priority traffic completely under sustained overload. Use weighted fair queueing or a reservation floor so low-priority customers see degraded service, not zero service.
-- **Cascading shed.** If every layer sheds 20% independently, you drop roughly 49% end-to-end when the signal warranted 20%. **Shed at the edge** and let downstream layers backpressure rather than re-shed.
+- **Cascading shed.** If three layers each independently shed 20%, end-to-end survival is `0.8^3 = 0.512` — you drop ~49% when the signal warranted 20%. **Shed once, at the edge** (the API gateway, or the first service that owns the priority taxonomy) and let downstream layers backpressure rather than re-shed. Concretely: gateway sheds based on per-tenant priority and global concurrency; internal services run bounded queues that block on full and trust the gateway has already done admission control.
 - **Hidden queues at every layer.** OS socket buffers, NIC ring buffers, NGINX worker queues, library-internal channels, the kernel's runqueue. Each adds latency invisibly and breaks the assumption that "my service queue is empty, so we're healthy." The classic symptom: queue-depth metric is zero but p99 is 4 seconds — the work is queued somewhere else.
 - **Re-queue loops and livelock.** Reject a request, the client retries immediately, you reject again. CPU goes to 100% serving rejections; useful work goes to zero. Pair shedding with caller-side backoff and a `Retry-After` header. On the consumer side, a poison message that fails and returns to the queue is the same livelock.
 - **Shedding the wrong thing.** Dropping cheap work (a health check, a 5-byte ack) while the expensive work (a full report query) sails through. Cost-aware shedding weighs requests by resource consumption, not count.
@@ -82,5 +84,5 @@ arrival rate
 
 - *"Latency is rising — should you scale up or shed load?"* — Both, but shed first. Scaling takes minutes (instance boot, JVM warm-up, cache fill); shedding takes milliseconds. Shedding protects the in-flight work that's already paid the cost of getting this far; scaling is the medium-term fix shedding buys you time for.
 - *"How do you implement priority shedding?"* — Tag every request with a priority class at the edge (customer tier, request kind, retry-vs-original). Maintain a per-class admission limit or weighted fair queue. Under overload, drop the lowest class first but reserve a floor so it's degraded, not extinct. The hard part is getting product to agree on the priority order before the incident.
-- *"How do you size a bounded queue?"* — Small enough that worst-case wait (queue length × per-item service time) is below your SLO. A bigger queue just defers the problem — you serve stale work and the producer doesn't get the backpressure signal until things are already broken. Heuristic: queue depth ≤ a few seconds of work.
+- *"How do you size a bounded queue?"* — Use Little's Law backwards: `L = λ × W`, so `max queue depth = arrival rate × tolerable wait`. If you serve 1000 rps and your latency SLO leaves 200 ms of slack for queueing, the cap is 200 items, not 10000. A bigger queue defers the problem — you serve stale work and the producer doesn't get the backpressure signal until things are already broken. The queue exists to absorb burstiness on the timescale of the service time, not to hold a backlog.
 - *"Why is dropping sometimes better than blocking?"* — Blocking propagates the failure: the producer's thread is stuck, and *its* upstream is now blocked too. The slowdown spreads in O(layers). Dropping localizes it: this request is gone, the producer is free to handle healthy traffic for unrelated callers. Drop when the producer has other useful work; block when the producer can correctly throttle its own source.

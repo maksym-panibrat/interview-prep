@@ -12,10 +12,14 @@ If you remember one consensus protocol, remember Raft. It exists because Paxos i
 
 A Raft cluster has `N` nodes (typically 3 or 5). Each node is **follower**, **candidate**, or **leader**. Time is divided into **terms** — monotonically increasing integers, at most one leader per term. A node persists `currentTerm`, `votedFor`, and its log to disk before responding to any RPC.
 
-```
-   term 7              term 8 (election)              term 8
- leader L1 ---X---> [no leader, candidates fight] ---> leader L2
-                    (election timeout, RequestVote)
+```mermaid
+stateDiagram-v2
+    [*] --> Follower
+    Follower --> Candidate: election timeout\n(no heartbeat)
+    Candidate --> Candidate: split vote / timeout\n(new term)
+    Candidate --> Leader: majority of votes
+    Candidate --> Follower: discover current leader\nor higher term
+    Leader --> Follower: discover higher term
 ```
 
 ### Election
@@ -26,13 +30,27 @@ Each follower runs a **randomized election timeout** (typically 150–300ms). If
 
 The leader appends client commands to its log and sends `AppendEntries` to followers. An entry is **committed** when it is durable on a majority of logs — at which point the leader applies it to its state machine and replies to the client. Followers apply committed entries in the same order. The invariant: **same operations applied in the same order to deterministic state machines produce the same state on every replica** — state-machine replication.
 
-```
-client --write--> leader
-                    | log: [.. e1 e2 e3]
-                    +--AppendEntries(e3)--> follower A   (ack)
-                    +--AppendEntries(e3)--> follower B   (ack)   <- majority
-                    +--AppendEntries(e3)--> follower C   (slow)
-                  e3 committed, apply to state machine, reply to client
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant L as Leader
+    participant A as Follower A
+    participant B as Follower B
+    participant D as Follower C
+    C->>L: write(e3)
+    Note over L: append e3 to log,<br/>fsync
+    par AppendEntries(e3)
+        L->>A: AppendEntries(e3)
+        A-->>L: ack
+    and
+        L->>B: AppendEntries(e3)
+        B-->>L: ack
+    and
+        L->>D: AppendEntries(e3)
+    end
+    Note over L: majority acked -><br/>commit e3, apply
+    L-->>C: ok
+    D-->>L: ack (later, catches up)
 ```
 
 ### Safety
@@ -45,7 +63,7 @@ A cluster of `N` tolerates `⌊N/2⌋` failures and needs `⌊N/2⌋ + 1` for an
 
 ### Paxos, Multi-Paxos, EPaxos
 
-**Paxos** (Lamport, 1989) is the original; single-decree Paxos agrees on one value through prepare/promise/accept/accepted phases. **Multi-Paxos** amortizes the prepare phase by electing a stable leader, so steady-state operation is one round trip per command — operationally similar to Raft, just less readable. **EPaxos** is leaderless: any replica can propose, conflicts ordered via dependency graphs. It pays off when writes rarely conflict and clients are geographically spread.
+**Paxos** (Lamport, 1989) is the original; single-decree Paxos agrees on one value through prepare/promise/accept/accepted phases. **Multi-Paxos** amortizes the prepare phase by electing a stable leader, so steady-state operation is one round trip per command — operationally similar to Raft, just less readable. **EPaxos** is leaderless: any replica acts as the command leader for its own proposals. Non-conflicting commands commit on the **fast path** in one RTT to the nearest fast-path quorum (roughly `⌈3N/4⌉`), so a client in any region pays only the latency to its closest replicas. Conflicting commands fall back to a **slow path** (a second RTT) and are ordered via a dependency graph at execution time. It pays off when commands rarely conflict and clients are geographically spread; under high conflict it degrades toward Multi-Paxos latency without the operational simplicity of a single leader.
 
 ## 3. When to use
 
@@ -67,14 +85,14 @@ Anti-signals — do not use consensus for:
 - **Latency floor is one majority round trip.** Within an AZ a few ms; across regions tens to hundreds. Every committed write pays it. You cannot optimize past it without weakening the guarantee.
 - **CP under partition.** Without a majority, the cluster makes no progress. The minority side is read-only at best (and only safely under a leader lease that has not expired). This is the price of strong consistency — pretending otherwise is split-brain.
 - **Single-leader throughput cap.** All writes funnel through the leader. Disk fsync on the leader is the floor on commit latency. Group commit batches help; raising IOPS helps; the only architectural escape is sharding into multiple Raft groups.
-- **Stale-leader reads.** A partitioned-out leader may still believe it is leader and serve local reads, missing commits by the new leader. Mitigations: route reads through the log (no-op committed via majority confirms leadership, slow); or use **leader leases** — reads served within a time-bounded lease are linearizable (faster, requires bounded clock drift).
+- **Stale-leader reads.** A partitioned-out leader may still believe it is leader and serve local reads, missing commits by the new leader. Mitigations: route reads through the log (no-op committed via majority confirms leadership, slow); or use **leader leases** — reads served within a time-bounded lease are linearizable (faster, but assumes a bound on monotonic-clock skew between leader and followers, since the leader times out the lease locally while followers wait at least that long before electing).
 - **Cluster reconfiguration is its own protocol.** Naive add/remove opens a window where two majorities disagree on membership. Raft uses **joint consensus** (`C_old,new` requires majority in both old and new sets). Operationally awkward and rarely well-tested in homegrown implementations.
 - **Disk fsync dominates p99.** Every commit is durable on the leader before ack — a noisy-neighbor disk becomes a cluster-wide latency spike. Provision dedicated disks for consensus volumes.
 - **Operational complexity.** Snapshots, log compaction, term and index invariants on disk — Raft is simpler than Paxos but still a real distributed system. Recovering from quorum loss is a fraught manual procedure.
 
 ## 5. Real-world and interviewer probes
 
-In the wild: **etcd** and **Consul** use Raft for their coordination logs; Kubernetes is etcd-on-Raft underneath. **ZooKeeper** uses **Zab**, a Paxos-family atomic broadcast protocol. **Spanner** runs Paxos per data range to replicate writes synchronously across zones, layering TrueTime on top for external consistency. **CockroachDB** runs Raft per range — one cluster contains tens of thousands of small Raft groups. **Kafka KRaft** is a Raft-based metadata quorum that replaced ZooKeeper for cluster controllers. **HashiCorp Vault** uses Raft for its integrated storage backend.
+In the wild: **etcd** and **Consul** use Raft for their coordination logs; Kubernetes is etcd-on-Raft underneath. **ZooKeeper** uses **Zab** — an atomic broadcast protocol with a single primary and a FIFO log per epoch, closer in shape to Raft than to classic Paxos despite the "Paxos-family" label. **Spanner** runs Paxos per data range to replicate writes synchronously across zones, layering TrueTime on top for external consistency. **CockroachDB** runs Raft per range — one cluster contains tens of thousands of small Raft groups. **Kafka KRaft** is a Raft-based metadata quorum that replaced ZooKeeper for cluster controllers. **HashiCorp Vault** uses Raft for its integrated storage backend.
 
 Probes you should expect:
 

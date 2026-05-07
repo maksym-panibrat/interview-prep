@@ -10,18 +10,16 @@ Every algorithm answers the same question two ways: how many requests in the las
 
 ### Token bucket
 
-A bucket holds up to `B` tokens and refills at rate `R` per second. Each admitted request takes one token; empty means reject. Bursts up to `B` allowed; sustained admit rate capped at `R`. Store two numbers per key — `tokens` and `last_refill_ts` — and lazily refill on access: `tokens = min(B, tokens + (now - last_refill_ts) * R)`. The workhorse.
+A bucket holds up to `B` tokens and refills at rate `R` per second. Each admitted request takes one token; empty means reject. Bursts up to `B` allowed; sustained admit rate capped at `R`. Store two numbers per key — `tokens` and `last_refill_ts` — and lazily refill on access:
 
 ```
-refill at R tokens/sec
-        |
-        v
-   +----------+
-   |  oo o o o|  capacity B
-   +----------+
-        |
-   request takes 1 token; empty -> reject
+tokens = min(B, tokens + (now - last_refill_ts) * R)
+last_refill_ts = now
+if tokens >= 1: tokens -= 1; admit
+else:           reject
 ```
+
+No background timer, no per-second writes — the read-modify-write at request time *is* the refill. The workhorse.
 
 ### Leaky bucket
 
@@ -37,14 +35,22 @@ Store a timestamp per request, count timestamps within the last `N` seconds. Exa
 
 ### Sliding window counter
 
-A weighted average of the previous window's count and the current window's count, prorated by how far into the current window you are. Small error band, two integers per key — the practical compromise most production limiters land on. Example: prev=80, current=20, 30% into current → estimate = 80×0.7 + 20 = 76.
+A weighted average of the previous window's count and the current window's count, prorated by how far into the current window you are. Small error band, two integers per key — the practical compromise most production limiters land on.
+
+```
+elapsed = (now - current_window_start) / window_size   # fraction in [0, 1)
+estimate = prev_count * (1 - elapsed) + current_count
+admit iff estimate < limit
+```
+
+Worked example: limit = 100/min, `prev_count = 80`, `current_count = 20`, 30% into current window. Estimate = `80 × 0.7 + 20 = 76`, admit. Versus a fixed-window scheme where the same caller could land 80 at the end of one minute and 100 at the start of the next — `180` requests in seconds while every fixed window stayed legal.
 
 ### Distributed quota
 
 A single gateway instance sees only a fraction of the traffic. To enforce a global limit you have three shapes:
 
 - **Centralized counter (Redis `INCR` with TTL).** One round trip per request; accurate, simple, and the counter for a hot key becomes the system's bottleneck. Mitigate by sharding the key (`key:0`..`key:N`, sum at check) or pre-allocating quota chunks per instance.
-- **Per-instance with periodic sync.** Each gateway tracks a local share and reconciles every few hundred milliseconds. Lower latency, resilient to a Redis blip; you over-shoot during the sync gap.
+- **Per-instance with periodic sync.** Each gateway tracks a local share and reconciles every few hundred milliseconds. Lower latency, resilient to a Redis blip. Worst-case over-shoot is roughly `sync_interval × per_instance_rate × instances` — a 200 ms sync across 100 instances each running at the local share of a 10k-RPS limit can leak ~2k requests above the global cap before the next reconcile.
 - **Probabilistic / sampled.** Each instance admits with a probability calibrated against the perceived global rate. Cheap, lossy at the edges, fine when "approximately fair" is the bar.
 
 ## 3. When to use
@@ -76,4 +82,4 @@ A single gateway instance sees only a fraction of the traffic. To enforce a glob
 - *"Distributed across 100 gateway instances?"* — Two practical options. Centralized Redis with the counter sharded across N keys, summed at check time — accurate, hot-key headache to solve. Or per-instance quotas with periodic sync — lower latency, mild over-shoot during the sync interval. "Exactly N per second globally" usually isn't the real requirement.
 - *"Fixed vs. sliding window?"* — Fixed is one counter per `(key, window)`, dirt cheap and atomic, but a client can deliver `2 × limit` across the boundary by timing the seam. Sliding window counter weights previous and current window's counts; same storage cost, no boundary burst, slightly approximate. Sliding-log is exact but storage scales with rate.
 - *"The limiter is down — fail open or closed?"* — Depends on what the limiter protects. For a public API guarded against abuse, fail open: serving extra traffic for a few minutes is recoverable, becoming a self-inflicted outage isn't. For billing-critical quotas or protection of a downstream that physically cannot survive overload, fail closed. Make the choice deliberately, write it on the runbook, rehearse it — don't discover it during the incident.
-- *"Per-key memory at huge scale?"* — Tracking millions of distinct keys, exact counters cost too much. Switch to probabilistic structures: count-min sketch for "how many requests has this key sent recently" with bounded over-counting, approximate top-K for the heaviest hitters. The keys that matter (the abusers) still surface.
+- *"Per-key memory at huge scale?"* — Tracking millions of distinct keys, exact counters cost too much. Switch to probabilistic structures: count-min sketch gives "how many requests has this key sent recently" with bounded over-counting in fixed memory; Misra-Gries or Space-Saving give approximate top-K for the heaviest hitters in O(K) memory regardless of key cardinality. You lose exactness on the long tail but the keys that actually matter — the abusers — still surface.

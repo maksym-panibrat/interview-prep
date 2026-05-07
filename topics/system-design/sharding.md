@@ -12,11 +12,12 @@ A shard is an independent slice — its own primary, replicas, backups. A *shard
 
 The key space is partitioned into contiguous ranges; each range lives on one shard.
 
-```
-shard A: keys [aaa..fzz]
-shard B: keys [gaa..mzz]
-shard C: keys [naa..szz]
-shard D: keys [taa..zzz]
+```mermaid
+flowchart LR
+    K[key space a..z] --> A[shard A: aaa..fzz]
+    K --> B[shard B: gaa..mzz]
+    K --> C[shard C: naa..szz]
+    K --> D[shard D: taa..zzz]
 ```
 
 Range scans are cheap — keys near each other live on the same shard. The price is hot ranges. Alphabetical user IDs put every "Smith" sign-up on one shard. A monotonic timestamp puts every new write on the last shard while the others sit cold; you've sharded into a single-shard system at the write tip. Spanner and HBase auto-split when ranges get too large or too hot, which softens the problem but doesn't eliminate skew on the active range.
@@ -54,7 +55,7 @@ Changing N triggers data movement. With `hash(key) mod N`, going from 4 to 5 sha
 
 Three moves, in increasing order of intrusiveness:
 
-- **Salt the key.** Append a random suffix per write: instead of `user:42`, write to `user:42:#0` through `user:42:#15`. Sub-keys hash to different shards; reads fan out and merge. Cheap, but reads scatter-gather.
+- **Salt the key.** Append a bucket suffix per write so a hot logical key fans out across shards. A celebrity follower-count row written as `followers:celeb_id` becomes `followers:celeb_id:0` through `followers:celeb_id:15`; each increment picks a random bucket, reads sum across all 16. Cheap to add, but every read becomes a 16-way scatter-gather, so you only pay it on the keys that actually need it.
 - **Introduce a secondary shard key.** If `user_id` is hot, shard on `(user_id, time_bucket)` or `(user_id, region)` so the hot tenant's data spreads across shards. Requires queries to carry the secondary component.
 - **Split the hot shard.** Move half its key range to a new shard. Range-sharded systems automate this; hash systems want consistent hashing with virtual nodes so you can add capacity to the hot ring arc.
 
@@ -64,7 +65,7 @@ Any query that doesn't carry the shard key has to fan out:
 
 - **Scatter-gather reads.** The coordinator sends to all shards and merges. Latency is bounded by the *slowest* shard — tail latency dominates as N grows.
 - **Aggregations.** Sum, count, top-K need a coordinator merge. Approximate sketches (HyperLogLog, t-digest) ship per-shard partials and merge cheaply; exact aggregations are expensive at scale.
-- **Joins across shards.** Don't. Denormalize so joined fields live on one shard, or duplicate the small side onto every shard. Distributed joins exist (Vitess, Citus) and are slow.
+- **Joins across shards.** Don't, in general. Denormalize so joined fields live on one shard, or duplicate the small side onto every shard as a reference table. Co-located joins — both tables distributed on the same key — are fine in Citus and Vitess; non-co-located joins do a shuffle and are slow enough that you should design them out of the hot path.
 
 ## 3. When to use
 
@@ -93,11 +94,11 @@ Anti-signals:
 
 In the wild:
 
-- **Vitess** (built for YouTube's MySQL fleet) handles routing, resharding via VReplication, and scatter-gather on top of vanilla MySQL.
-- **Citus** does the same for Postgres, with distributed query planning and reference-table replication for small joined dimensions.
-- **MongoDB sharded clusters** use range or hashed shard keys with `mongos` as the router and a config-server replica set as the directory.
-- **Cassandra** and **DynamoDB** hash the partition key onto a consistent-hashing ring; the partition key choice is the hot-partition surface, and DynamoDB's adaptive capacity is its hot-partition mitigation.
-- **Spanner** uses range sharding with automatic split and merge, plus Paxos groups per range.
+- **Vitess** (built for YouTube's MySQL fleet) handles routing, resharding via VReplication (logical CDC stream from old shards to new), and scatter-gather on top of vanilla MySQL.
+- **Citus** does the same for Postgres, with distributed query planning and reference tables broadcast to every worker for small joined dimensions; co-located joins on the distribution column run as pushed-down per-shard joins.
+- **MongoDB sharded clusters** use range or hashed shard keys with `mongos` as the router and a config-server replica set as the directory; the balancer migrates chunks between shards when chunk size or shard imbalance crosses thresholds.
+- **Cassandra** and **DynamoDB** hash the partition key onto a consistent-hashing ring; the partition key choice is the hot-partition surface, and DynamoDB's adaptive capacity (re-hosting hot partitions on dedicated capacity) is its hot-partition mitigation.
+- **Spanner** uses range sharding with automatic split and merge driven by both size and load (a CPU-hot range gets split even if it's small), plus Paxos groups per range.
 - **Snowflake-style ID generation** (Twitter Snowflake, ULID, KSUID) interleaves a worker/random component into the ID so concurrent writes don't all hash to the same shard or pile onto the last range — sharding-friendly IDs without giving up rough time ordering.
 
 Probes:

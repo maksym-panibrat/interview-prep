@@ -12,14 +12,15 @@ The write side ("command side") owns business invariants. A command (`PlaceOrder
 
 The read side ("query side") is one or more **denormalized stores**, each shaped to one query: a search index for free-text order search, a document store keyed by user with order history pre-joined, a pre-aggregated table of daily revenue by region. None are good for writing into; each is excellent for the one read it was built for.
 
-```
-commands --> Write model (normalized) --events--+
-                                                |
-                +-------------------------------+-------------------------------+
-                v                               v                               v
-          Search index (ES)            User-orders (Mongo)              Revenue rollup
-                ^                               ^                               ^
-queries --------+-------------------------------+-------------------------------+
+```mermaid
+graph LR
+    C[commands] --> W[Write model<br/>normalized]
+    W -->|events| ES[Search index<br/>ES]
+    W -->|events| UO[User-orders<br/>Mongo]
+    W -->|events| RR[Revenue rollup]
+    Q[queries] --> ES
+    Q --> UO
+    Q --> RR
 ```
 
 ### Projections
@@ -39,9 +40,9 @@ In the **without-event-sourcing** form — the common case — events are a side
 
 In **event sourcing**, events *are* the source of truth. The write model itself is a projection: to load aggregate state, fold over its events. No row in `orders` to read directly; there is `order_events` and a function. The write database, if any, is a cache.
 
-That buys you a perfect audit log (events *are* the history) and the ability to derive any past state by replaying to a point in time. It costs the quick `UPDATE` — every change is an event, every read pays a fold (mitigated by snapshots), migrations are events, no admin panel just edits a row.
+That buys you a perfect audit log (events *are* the history) and the ability to derive any past state by replaying to a point in time. It costs the quick `UPDATE` — every change is an event, every aggregate load on the write side pays a fold over its event stream (mitigated by snapshots), migrations are events, no admin panel just edits a row. Read-side queries still hit denormalized read models; the fold cost is paid when commands load aggregate state, not on every user-facing read.
 
-Event sourcing is a separate cost decision *on top of* CQRS. CQRS without event sourcing is the common production shape; event sourcing without CQRS is rare and usually a mistake.
+CQRS and event sourcing are orthogonal: CQRS is the read/write model split, event sourcing is events-as-source-of-truth. You can do either without the other. CQRS without event sourcing is the common production shape — outbox + CDC pushes events from a normal database into read models. Event sourcing without CQRS is rare and usually a mistake: if every read folds events, you nearly always want denormalized read models alongside.
 
 ## 3. When to use
 

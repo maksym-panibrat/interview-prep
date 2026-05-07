@@ -8,13 +8,25 @@ Pub/sub is the easy part: producers publish to a topic, consumers subscribe, the
 
 A pub/sub system has three nouns — producers, the broker, and consumers — and a handful of dials that decide what guarantees you actually get.
 
-```
-  producer 1 --\                        /--> consumer A (group 1)
-                >--> [ topic / log ] -- +--> consumer B (group 1)
-  producer 2 --/   (partitioned)         \--> consumer X (group 2)
+```mermaid
+graph LR
+    P1[producer 1] --> T
+    P2[producer 2] --> T
+    subgraph T[topic]
+        direction TB
+        Part0[partition 0]
+        Part1[partition 1]
+        Part2[partition 2]
+    end
+    Part0 --> CA[consumer A<br/>group 1]
+    Part1 --> CB[consumer B<br/>group 1]
+    Part2 --> CB
+    Part0 --> CX[consumer X<br/>group 2]
+    Part1 --> CX
+    Part2 --> CX
 ```
 
-The topic is usually a **partitioned log**. A partition is an append-only ordered file; a topic is N of them. Throughput scales with partition count; ordering is scoped to a single partition.
+The topic is usually a **partitioned log**. A partition is an append-only ordered file; a topic is N of them. Throughput scales with partition count; ordering is scoped to a single partition. Each partition is assigned to exactly one consumer per group at a time — that is what gives group 1 horizontal parallelism while group 2, with a single consumer, gets the full stream.
 
 ### Delivery guarantees
 
@@ -24,7 +36,30 @@ Three points on the spectrum, set by *when* the consumer commits its offset rela
 - **At-least-once.** Process first, commit on success. If the consumer crashes after processing but before committing, the broker redelivers on restart. Standard default. Requires consumers be idempotent because duplicates are not "rare" — they are routine.
 - **Exactly-once.** Not achievable as a delivery property across an unreliable network. The Two Generals Problem: the consumer cannot both process and ack in a single atomic step the network can confirm. What is achievable is exactly-once *effects*, by combining at-least-once delivery with idempotent processing — typically a dedup key carried on the message and checked against a store before applying the side effect.
 
-When a vendor advertises "exactly-once," ask precisely which step. Usually they mean a transactional producer + transactional consumer within their own system (Kafka EOS), or built-in dedup IDs (SQS FIFO). Both are useful, neither rescues effects that cross the broker boundary into another system.
+The recipe for exactly-once effects, end-to-end:
+
+```
+# Producer: stamp every message with a stable ID at the source.
+event_id = uuid7()                       # stable, derived once, never regenerated on retry
+publish(topic, key=order_id, headers={"event_id": event_id}, body=...)
+
+# Consumer: at-least-once delivery, idempotent apply.
+for msg in poll():
+    with db.transaction():               # one atomic unit
+        inserted = db.execute(
+            "INSERT INTO processed_events(event_id) VALUES (?) "
+            "ON CONFLICT DO NOTHING",
+            msg.headers["event_id"],
+        )
+        if inserted.rowcount == 0:
+            continue                     # duplicate; effect already applied
+        apply_side_effect(msg)           # write to the same DB
+    commit_offset(msg)                   # only after the transaction lands
+```
+
+The two non-negotiables: the dedup key is generated once at the producer (not per retry), and the dedup-table write happens in the *same* transaction as the side effect. If the side effect is in another system (HTTP API, second database), you need a transactional outbox or a two-phase coordinator — see [the outbox pattern](outbox-cdc.md). A dedup table in DB-A cannot guarantee an HTTP POST to service B happened exactly once; it can only guarantee that DB-A reflects the event exactly once.
+
+When a vendor advertises "exactly-once," ask precisely which step. Kafka EOS, for example, is transactional producer + read-committed consumer + transactional offset commit, all within a single Kafka cluster — you publish to topic A, read from topic A, write to topic B, commit the offset, all atomically. The moment the consumer's side effect leaves the broker (writing to Postgres, calling Stripe, publishing to a different cluster), Kafka EOS no longer applies and you are back to at-least-once + idempotent consumer. SQS FIFO's built-in dedup is a five-minute message-deduplication window on the *producer* side, not effect-level idempotency on the consumer side.
 
 ### Ordering
 
@@ -67,11 +102,11 @@ Anti-signals:
 
 - **Duplicates are routine, not rare.** At-least-once means redelivery on every crash, network blip, or commit-before-broker-ack race. Consumer idempotency is not a nice-to-have; it is the contract.
 - **Ordering is per-partition only.** Cross-partition ordering does not exist, by design. If your business invariant requires "event A before event B," they must share a partition key — usually because they share an aggregate.
-- **Rebalance pauses.** When a consumer joins, leaves, or fails its heartbeat, the group rebalances: all consumers pause, partitions are reassigned, processing resumes. Frequent rebalances — caused by consumer churn, slow processing exceeding `max.poll.interval.ms`, or autoscaling thrash — are a scaling killer. Tune heartbeat and poll intervals; use sticky/cooperative rebalance protocols where the broker supports them.
+- **Rebalance pauses, and the max-poll cascade.** When a consumer joins, leaves, or fails its heartbeat, the group rebalances: all consumers pause, partitions are reassigned, processing resumes. The pathological mode is the `max.poll.interval.ms` cascade: a slow message (DB lock, GC pause, slow downstream) keeps the consumer past the poll deadline, the broker evicts it, the group rebalances, that consumer's partitions move to a peer who is *also* near its deadline because it was already behind, and so on. Symptom: rolling rebalances, lag climbing, consumers logging "this consumer is no longer a member of the group." Fix the *cause* (per-message processing time) before tuning timeouts; raising `max.poll.interval.ms` past your real SLO just delays the eviction. Use cooperative rebalance protocols (Kafka's `CooperativeStickyAssignor`) so each rebalance only pauses moving partitions, not the whole group.
 - **Slow consumer = backlog growth.** Consumer lag (broker offset minus committed offset) is the canary — the [backpressure](backpressure-load-shedding.md) signal of a partitioned log. When it grows monotonically, you are losing ground. Remedies: parallelize within a partition (only safe if processing is per-message, not per-key sequence), repartition the topic, or scale out the consumer group up to the partition count — not beyond, because extra consumers sit idle.
 - **Poison messages.** One unprocessable message at the head of a partition blocks every message behind it. Bounded retries with exponential backoff, then DLQ. Without DLQ, the consumer loops forever and the partition stalls.
 - [**Schema evolution**](schema-evolution.md)**.** Producers and consumers deploy independently, so backward-compatibility on the wire is non-negotiable. Use a schema registry plus Protobuf or Avro; treat field removal as a breaking change; never reuse a field number.
-- **The "exactly-once" myth.** Repeated deliberately because every team rediscovers it. If a vendor sells exactly-once delivery, they mean exactly-once within their own system under specific configuration — a transactional producer that fences zombies, a transactional consumer reading committed records, both inside the same broker. The moment your consumer writes to an external database, an HTTP API, or a different broker, you are back to at-least-once and idempotency is the answer.
+- **The "exactly-once" myth.** Repeated deliberately because every team rediscovers it. Vendor "exactly-once" is always scoped: Kafka EOS is transactional within one Kafka cluster (producer fencing + read-committed isolation + atomic offset commit); SQS FIFO dedup is a producer-side five-minute window. The moment your consumer's effect leaves that boundary — to Postgres, to Stripe, to a different broker — you are back to at-least-once, and the answer is the dedup-key recipe in §2, not a configuration flag.
 
 ## 5. Real-world and interviewer probes
 

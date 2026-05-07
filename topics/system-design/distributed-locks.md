@@ -14,27 +14,32 @@ A distributed "lock" is really a **lease**: an exclusive grant with a TTL, renew
 
 The lease introduces a timing assumption: the holder checks "do I still hold the lease?" often enough relative to the TTL. That breaks the moment the runtime stops cooperating — a stop-the-world GC pause, a scheduling stall on an over-committed VM, a swapping host. The client wakes up, still believing it holds the lock, and writes. Meanwhile the service has reissued the lease to someone else, who is also writing.
 
-```
-client A acquires lease (TTL = 30s)        client B
-   |                                          .
-   | -- GC pause 45s ------------------       .
-   .                                          .
-   .                  lease expires (t=30)    .
-   .                                          .
-   .                                  client B acquires lease
-   .                                  client B writes (token = 34)
-   |                                          .
-   | wakes, still thinks it holds lock        .
-   | writes (token = 33)  -- REJECTED by resource (33 < 34)
+```mermaid
+sequenceDiagram
+    participant A as Client A
+    participant L as Lock service
+    participant R as Resource
+    participant B as Client B
+    A->>L: acquire (TTL = 30s)
+    L-->>A: granted, token = 33
+    Note over A: GC pause 45s
+    Note over L: lease expires at t=30
+    B->>L: acquire
+    L-->>B: granted, token = 34
+    B->>R: write (token = 34)
+    R-->>B: accepted; last_fence = 34
+    Note over A: wakes, still believes it holds the lock
+    A->>R: write (token = 33)
+    R-->>A: REJECTED (33 < 34)
 ```
 
 A network partition that cuts the holder off from the service, or a clock jump on the service host, produces the same picture. **You cannot use wall-clock time to reason about safety across processes** — time on the holder and time on the service are not the same clock.
 
 ### Fencing tokens
 
-The fix is to stop trusting the holder. Every successful acquisition returns a monotonically increasing **fencing token** — `33`, `34`, `35`, never reused, never decreasing. The protected resource tracks the highest token it has accepted and **rejects any write with a smaller token**. The zombie above writes `33` after the resource has accepted `34`; the resource refuses it. The lock service no longer has to be perfect — the resource is the source of truth for "who is current."
+The fix is to stop trusting the holder. Every successful acquisition returns a monotonically increasing **fencing token** — `33`, `34`, `35`, never reused, never decreasing. Every write to the protected resource carries the token; the resource remembers the highest token it has accepted and **rejects any write with a smaller token**. The zombie above writes `33` after the resource has accepted `34`; the resource refuses it. The lock service no longer has to be perfect — the resource is the source of truth for "who is current."
 
-The resource must support the check. A database stores `last_fence` on the row: `UPDATE ... WHERE row = ? AND last_fence < ?`. An object store with conditional writes (S3 If-Match, GCS generation numbers) carries the token as the precondition. A plain POSIX filesystem cannot — and that is the honest answer to "is a lock for this resource safe?"
+The check has to live at the resource, in the same atomic step as the write. A database stores `last_fence` on the row: `UPDATE ... SET ..., last_fence = ? WHERE id = ? AND last_fence < ?`. An object store with conditional writes carries the token as the precondition (S3 `If-Match` on the ETag, GCS `x-goog-if-generation-match`). A plain POSIX filesystem cannot — there is no atomic "check-then-write" against a stored fence — and that is the honest answer to "is a lock for this resource safe?"
 
 ### Coordination service-backed (etcd, ZooKeeper)
 
@@ -42,11 +47,11 @@ A strongly consistent, [leader-elected store](leader-election-consensus.md). A l
 
 ### Single-Redis with TTL
 
-`SET key value NX PX 30000`. One round trip, microseconds, easy to reason about. Loses correctness on failover: master acks the `SET` and crashes before replicating; replica is promoted; a second client acquires the same lock. Two holders, no fencing.
+`SET key value NX PX 30000`. One round trip, microseconds, easy to reason about. Loses correctness on failover because Redis replication is asynchronous: the master acks the `SET` to the client, then crashes before the write reaches the replica; sentinel promotes the replica, which has no record of the lock; a second client `SET NX` succeeds. Two holders, same key, no fencing — and the lock service itself can't tell.
 
 ### Redlock (multi-Redis)
 
-Redlock acquires on a [majority of `N` independent Redis nodes](quorum-consistency.md) within a bounded time window, treating that majority as ownership. Martin Kleppmann's well-known critique: Redlock relies on bounded clock drift and bounded GC pauses across those nodes — a long enough holder pause violates safety **even when every node operated correctly** — and without fencing tokens no claimed safety property is provable. Redis's antirez defended the algorithm under different threat models. Take the lesson, not a side: **fencing tokens are the answer, not which lock service you used.**
+Redlock acquires on a [majority of `N` independent Redis nodes](quorum-consistency.md) within a bounded time window, treating that majority as ownership. Martin Kleppmann's well-known critique has two prongs. First, the timing-assumption problem common to any TTL lock: a long enough holder pause (GC, scheduling stall) lets the lease expire and be reissued before the holder notices — without fencing tokens, you cannot prove safety against the resulting double-write, and Redlock proposes none. Second, the multi-node-specific problem: Redlock's safety argument depends on bounded clock drift across the `N` Redis nodes, since each node's TTL runs on its own clock; a clock jump on one node (NTP step, VM migration) can release that node's slice early and let a quorum re-form for a second client. antirez pushed back on the model — disputing the assumption that clock jumps of the relevant magnitude actually happen on production hosts and arguing the algorithm holds under the threat model Redlock was designed for. Take the lesson, not a side: **fencing tokens are the answer, not which lock service you used.**
 
 ## 3. When to use
 

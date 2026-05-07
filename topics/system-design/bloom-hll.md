@@ -26,7 +26,15 @@ Query "dave"   -> {3, 9, 14} any 0 -> "no"     (true negative)
 
 `carol` was never inserted, but her three bits were set by `alice` and `bob` together. That is the false-positive event.
 
-For `n` inserted keys, the false-positive rate is approximately `p ≈ (1 - e^{-kn/m})^k`. Optimal sizing for target `p` at expected cardinality `n`: `m = -n · ln(p) / (ln 2)^2` bits and `k = (m/n) · ln 2` hash functions. A 1% rate at `n = 10M` takes about 12 MB and `k = 7`; cutting `p` to 0.1% adds about 50% more memory (~5 more bits per element, since `m` scales with `−ln p`).
+For `n` inserted keys, the false-positive rate and the optimal sizing for target `p` at expected cardinality `n` are:
+
+```
+p   ≈ (1 - e^{-kn/m})^k
+m   = -n · ln(p) / (ln 2)^2     bits
+k   = (m/n) · ln 2              hash functions
+```
+
+A 1% rate at `n = 10M` takes about 12 MB and `k = 7` (~9.6 bits per element). Since `m` scales with `−ln p`, going from 1% to 0.1% multiplies memory by `ln(10⁻³)/ln(10⁻²) = 1.5` — about 50% more, or ~5 extra bits per element. Each further 10× FPR reduction costs another fixed ~5 bits per element, not a doubling.
 
 ### Counting Bloom and Cuckoo filters
 
@@ -34,15 +42,15 @@ Vanilla Bloom does not support deletion: clearing a bit could falsify keys that 
 
 ### HyperLogLog
 
-Hash each item to a uniformly distributed value and split it into a bucket selector and a tail. Per bucket, track the maximum number of leading zeros seen in its tail. Because hash bits are uniform, a `ρ`-leading-zero prefix is a 1-in-`2^ρ` event, so the maximum `ρ` per bucket is a noisy estimator of `log2(n)`. Averaging across `m` buckets via a harmonic mean gives the cardinality estimate, with relative standard error `~1.04 / √m`.
+Hash each item to a uniformly distributed value and split it into a bucket selector and a tail. Per bucket, track the maximum number of leading zeros seen in its tail. Because hash bits are uniform, a `ρ`-leading-zero prefix is a 1-in-`2^ρ` event, so each bucket's max `ρ` is a noisy estimator of `log2(n/m)` — the cardinality routed to it. The harmonic mean of `2^ρ_j` across buckets, multiplied by `m` and a bias constant `α_m`, gives the cardinality estimate, with relative standard error `~1.04 / √m`.
 
 Concrete sizing: `m = 2^12 = 4096` buckets at 6 bits each is about **3 KB** and yields **~1.6% relative error**, whether you're counting 10 thousand or 10 billion distinct items. Bumping to `2^14` buckets (~12 KB) cuts the error to ~0.8%.
 
-Pure HLL underestimates at small cardinality; **HLL++** (Redis, BigQuery, DataSketches) detects the low-end regime and switches to a linear-counting estimator from the empty-bucket count, hiding the regime change behind one knob. HLL tells you *how many distinct*, not *which ones* — pair with a separate structure if you also need identity.
+Pure HLL underestimates at small cardinality; **HLL++** (Google, 2013) detects the low-end regime and switches to a linear-counting estimator from the empty-bucket count, hiding the regime change behind one knob. BigQuery and DataSketches implement HLL++ directly; Redis ships a related dense/sparse HLL with its own bias correction. HLL tells you *how many distinct*, not *which ones* — pair with a separate structure if you also need identity.
 
 ### Mergeability — the distributed-systems point
 
-This is why both dominate at scale. **Bloom merge** is bitwise OR of two filters built with the same `m` and `k`, yielding the Bloom of the union. **HLL merge** is elementwise max of two register arrays of the same precision, yielding the HLL of the union. Each shard keeps its own structure locally; ship the fixed-size summary to a coordinator and merge. No re-shuffling, no exact deduplication, no shared state. That is how Redis Cluster computes `PFCOUNT` across keys, how Cassandra ships per-SSTable Bloom filters with replicas, and how a fleet of edge nodes reports unique-visitor counts hourly without a central database.
+This is why both dominate at scale. **Bloom merge** is bitwise OR of two filters built with the same `m` and `k`, yielding the Bloom of the union. **HLL merge** is elementwise max of two register arrays of the same precision, yielding the HLL of the union. Each shard keeps its own structure locally; ship the fixed-size summary to a coordinator and merge. No re-shuffling, no exact deduplication, no shared state. That is how Redis Cluster computes `PFCOUNT` across keys, how a fleet of edge nodes reports unique visitors hourly without a central database, and how ad-tech systems estimate cross-campaign reach by OR-ing or max-ing per-shard summaries instead of moving the underlying IDs.
 
 ## 3. When to use
 

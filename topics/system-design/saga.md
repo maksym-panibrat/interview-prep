@@ -20,16 +20,27 @@ ShipPackage      <-> CancelShipment
 SendNotification <-> (none — irreversible)
 ```
 
-Compensations are new business operations, not DB rollbacks: a refund is a separate ledger entry, not an UNDO of the charge. The saga maintains the invariant "every executed forward step is either still committed or has been compensated" — eventually.
+Compensations are new business operations, not DB rollbacks: a refund is a separate ledger entry, not an UNDO of the charge. They also do not always restore the pre-step world. A refund after capture differs from a void of an authorization (different fees, different timelines, different visibility on the customer's statement); releasing inventory after a downstream `ShipPackage` already left the warehouse is not the same as releasing a reservation. Treat compensations as their own first-class operations with their own preconditions and partial-success behavior, not as inverses. The saga maintains the invariant "every executed forward step is either still committed or has been compensated" — eventually.
 
 ### Choreography
 
 Services react to each other's events; no central coordinator. Order emits `OrderPlaced`, inventory emits `InventoryReserved`, payments emits `CardCharged`, shipping ships. On failure a service emits a `*Failed` event and upstream services listen for it to trigger their compensations.
 
-```
-OrderSvc --OrderPlaced--> InventorySvc --InventoryReserved--> PaymentSvc --CardCharged--> ShippingSvc
-                                                                  |
-                                                                  +--ChargeFailed--> InventorySvc (compensate)
+```mermaid
+sequenceDiagram
+    participant O as OrderSvc
+    participant I as InventorySvc
+    participant P as PaymentSvc
+    participant S as ShippingSvc
+    O-->>I: OrderPlaced
+    I-->>P: InventoryReserved
+    alt charge succeeds
+        P-->>S: CardCharged
+        S-->>O: PackageShipped
+    else charge fails
+        P-->>I: ChargeFailed (compensate)
+        I-->>O: InventoryReleased
+    end
 ```
 
 Decoupled and simple per service, but the saga as a whole is **invisible** — no single place describes the workflow, and adding a step means changing event topologies in multiple services.
@@ -38,13 +49,19 @@ Decoupled and simple per service, but the saga as a whole is **invisible** — n
 
 A dedicated **saga orchestrator** holds the workflow state and explicitly issues commands; services become step executors that handle commands and reply with success or failure.
 
-```
-            +-------------------+
-            | OrderOrchestrator |
-            +-------------------+
-              |   ^   |   ^   |
-              v   |   v   |   v
-            Inventory  Payments  Shipping
+```mermaid
+sequenceDiagram
+    participant Orch as OrderOrchestrator
+    participant Inv as Inventory
+    participant Pay as Payments
+    participant Ship as Shipping
+    Orch->>Inv: ReserveInventory
+    Inv-->>Orch: Reserved
+    Orch->>Pay: ChargeCard
+    Pay-->>Orch: Charged
+    Orch->>Ship: ShipPackage
+    Ship-->>Orch: Shipped
+    Note over Orch: on any failure,<br/>walk compensation list<br/>backwards over executed steps
 ```
 
 The orchestrator owns the state machine ("reserved → charged → shipped → notified") and on failure walks the compensation list backwards. Centralized, easier to debug, easier to change. Pays for itself the moment a workflow has more than three or four steps or a non-trivial branch.
@@ -77,12 +94,12 @@ Anti-signals:
 ## 4. Trade-offs and failure modes
 
 - **No isolation.** Other reads see in-flight saga state — inventory shows `RESERVED` items as unavailable even though the saga may compensate and release them. Designs need semantic locks or compensating reads. ACID's "I" is the property you give up, and it is real money on the table.
-- **Compensations may not be possible.** "Send email" cannot be unsent; a webhook fired to a third party cannot be retracted. The cure is structural: **design steps so the irreversible one is last**, after every step that could fail. Notification is last in the order example for exactly this reason.
+- **Compensations may not be possible.** "Send email" cannot be unsent; a webhook fired to a third party cannot be retracted. The cure is structural: **order steps so the irreversible one is last**, after every step that could fail. Once you reach it the saga is past its last decision point — by construction there is nothing left that can fail and force a compensation. Notification is last in the order example for exactly this reason; if it itself fails, treat it as a forward retry, never a saga rollback.
 - **Compensation chains can fail.** A `RefundCard` the processor rejects leaves the saga half-compensated. Compensations must be idempotent, retried with backoff, and escalated to a human queue when retries exhaust — a refund the bank refuses is a person's problem.
 - **Choreography has no central state.** "Where did this saga get stuck?" becomes a distributed-tracing problem across N services. Orchestration trades coupling for one place to look.
 - **Orchestrator is a SPOF if not HA.** Replicate it and persist state, or a single instance crashing mid-saga loses the workflow.
 - **Step delivery is a delivery-atomicity problem.** The orchestrator must publish "do step N" reliably even if it crashes mid-publish — the dual-write problem. The answer is the [transactional outbox](outbox-cdc.md): persist the state transition and outbound command in one DB transaction, ship via CDC or a relay, dedup on `(saga_id, step)` at the handler.
-- **2PC is a smell, not an alternative.** XA holds resource locks for the saga's duration (potentially hours), doesn't survive participant failure cleanly (in-doubt transactions strand DB locks for operators), throughput collapses, and third-party APIs don't speak XA anyway. Sagas trade isolation for liveness — the right trade in essentially every microservices context.
+- **2PC is a smell, not an alternative.** XA holds resource locks across the prepare round-trip with every participant; under concurrency this serializes contended rows behind cross-service network latency and throughput collapses. A coordinator crash after `prepare` but before `commit` leaves participants **in-doubt** with locks held until an operator resolves them by hand. Third-party APIs (billing, shipping) don't speak XA anyway, so the protocol cannot even cover the actual saga. Sagas trade isolation for liveness — the right trade in essentially every microservices context.
 - **Timeouts.** Every step needs a timeout and defined timeout behavior (usually "treat as failure, compensate"); without it a stuck step hangs the saga forever.
 - **Versioning long-running sagas.** A three-day saga may outlive a deploy that changes its step set. Either version sagas (V1 sagas finish on V1 code) or keep step changes backward compatible. Temporal makes this explicit; hand-rolled orchestrators discover it the hard way.
 

@@ -16,7 +16,7 @@ Metrics are aggregates over time. Three frameworks cover almost every case, comp
 - **USE** (per resource — CPU, disk, queue, pool): **U**tilization, **S**aturation, **E**rrors. The internal-capacity view.
 - **Four Golden Signals** (Google SRE): **latency, traffic, errors, saturation.** A superset of RED with saturation; the canonical answer if an interviewer asks for one framework.
 
-Aggregation rule: **histograms over averages.** An average hides the tail; a histogram lets you compute p50/p95/p99/p99.9 directly. The interesting failure modes (GC pauses, [slow downstreams](resilience-four-pack.md), queue backups) live at p99 and above, invisible in the mean.
+Aggregation rule: **histograms over averages.** A mean of 50ms with a p99 of 5s is a system where 1% of users are getting hurt and your dashboard says fine; the average drowns the tail in volume. Record histograms (Prometheus `histogram_quantile`, OTel explicit-bucket or exponential histograms) so you can read p50/p95/p99/p99.9 directly. The interesting failure modes — GC pauses, [slow downstreams](resilience-four-pack.md), queue backups — only appear above p99.
 
 ### Structured logging
 
@@ -30,13 +30,16 @@ Every request gets a UUID at the edge (load balancer, API gateway, ingress) and 
 
 A trace is a tree of **spans**, one per logical operation, linked parent-to-child. The shape shows where time was spent and where errors originated.
 
+```mermaid
+graph TD
+    A["POST /orders — 2400ms"] --> B["inventory.reserve — 120ms"]
+    A --> C["payments.charge — 2200ms"]
+    C --> D["stripe.api.charge — 2150ms"]
+    style C fill:#fdd
+    style D fill:#fdd
 ```
-trace_id=t1
-└── POST /orders               2400ms
-    ├── inventory.reserve       120ms
-    └── payments.charge        2200ms  ← latency lives here
-        └── stripe.api.charge 2150ms  ← and here
-```
+
+The shaded path is where the latency lives: `payments.charge` owns the time, and almost all of it is in the outbound `stripe.api.charge` call. Without the tree you would only see "checkout is slow."
 
 100% tracing is too expensive at any reasonable QPS, so traces are **sampled**:
 
@@ -47,7 +50,7 @@ trace_id=t1
 
 ### Cardinality discipline
 
-Every label dimension on a metric multiplies stored time-series. A metric labelled `service × endpoint × status × user_id` over a million users has a million series per (service, endpoint, status) combination, and Prometheus collapses under that. **Bound cardinality at instrumentation time:** keep low-card labels (service, endpoint, status, region) on metrics; push high-card identifiers (user ID, request ID, full URL) to logs and trace attributes. Exemplars cover the gap — a histogram bucket can carry a trace ID without exploding the metric.
+In a TSDB, **each unique combination of label values is a separate time-series** with its own index entry and in-memory chunk — not a column on a shared row. So labels multiply: `service × endpoint × status × user_id` over a million users is a million series per `(service, endpoint, status)` triple, and Prometheus OOMs long before that. **Bound cardinality at instrumentation time:** keep low-card labels (service, endpoint, status, region) on metrics; push high-card identifiers (user ID, request ID, full URL) to logs and trace attributes. Exemplars cover the gap — a histogram bucket can carry a trace ID without exploding the metric.
 
 ## 3. When to use
 
@@ -63,7 +66,7 @@ Anti-signals: a single-user prototype on your laptop (stdout is fine); a cron jo
 - **Sampled traces miss rare paths.** 1% head-based sampling will not catch a 0.01% error rate; you see metric error spikes with no example trace to drill into. Tail-based sampling fixes this at the cost of buffering and a centralized collector. For high-stakes flows (payments, auth) consider 100% trace retention.
 - **Log volume cost.** At scale, logging every request body costs more than the application itself. Sample logs too: errors at 100%, sample successes, redact PII before write — and make redaction a framework concern, not a per-call discipline.
 - **Correlation ID gaps.** Any service that drops the header breaks the chain. The bug is silent — logs still write, just without the ID — and you discover it during an incident when the trace stops mid-graph. Enforce propagation at the framework / mesh level so application code cannot opt out.
-- **Alerting on symptoms vs. causes.** Alert on user-facing symptoms (SLO burn rate, error rate, p99 latency) — stable across refactors, fires when users are actually hurt. Diagnose with traces and logs, *don't alert on them*. Cause alerts ("CPU > 80%", "queue depth > 1000") go stale the moment infrastructure changes and train the on-call to ignore the pager.
+- **Alert on symptoms; diagnose with traces and logs.** Pages should fire on user-facing symptoms — SLO burn rate, error rate, p99 latency — which stay stable across refactors and only fire when users are actually hurt. Cause-based pages ("CPU > 80%", "queue depth > 1000") go stale the moment the infrastructure changes underneath them, and they train the on-call to ignore the pager. Traces and logs are the *diagnostic* layer you reach for after a symptom alert fires; they should not be alert sources themselves.
 - **Vendor lock.** Every stack historically had its own protocol. **OpenTelemetry** is the cure: a vendor-neutral wire format and SDK across all three signals. Instrument once in OTel; swap Datadog for Honeycomb without touching application code.
 - **Trace context loss across async boundaries.** A queue → consumer hop drops trace context unless the producer puts `traceparent` into message headers (Kafka headers, SQS attributes) and the consumer reads it back. The single most common place trace trees break in microservices.
 

@@ -10,28 +10,22 @@
 
 One node is the **leader**; it accepts all writes, appends them to a change log, and streams the log to **followers** that apply the same changes in the same order. Reads can hit the leader or any follower. This is the default for most operational datastores — Postgres, MySQL, MongoDB replica sets — because the consistency model is simple: a single serial point for writes, followers converge.
 
-```
-                      writes
-                         |
-                         v
-            +------------+------------+
-            |          Leader         |
-            +------------+------------+
-                         |
-              streaming log (WAL/binlog)
-                         |
-             +-----------+-----------+
-             v           v           v
-         Follower    Follower    Follower
-            |           |           |
-           reads       reads       reads
+```mermaid
+flowchart TD
+    C[Client writes] --> L[Leader]
+    L -- WAL/binlog --> F1[Follower]
+    L -- WAL/binlog --> F2[Follower]
+    L -- WAL/binlog --> F3[Follower]
+    F1 --> R1[Reads]
+    F2 --> R2[Reads]
+    F3 --> R3[Reads]
 ```
 
 The leader is a bottleneck for writes and a SPOF until failover completes.
 
 ### Multi-leader
 
-Multiple nodes accept writes — typically one leader per region — and replicate to each other. You get write availability under regional partition and lower write latency for users near a local leader. The cost is **conflict resolution**: two regions can write the same row simultaneously, and you need a deterministic rule for what wins. Options ranked by data-loss risk: **last-write-wins** (a timestamp picks one, drops the other — simple, lossy), **CRDTs** (merges are commutative and associative — no loss, but you only get what the CRDT allows: counters, sets, registers, ordered lists), and **application-level merge** (custom code per type — no loss, full flexibility, expensive).
+Multiple nodes accept writes — typically one leader per region — and replicate to each other. You get write availability under regional partition and lower write latency for users near a local leader. The cost is **conflict resolution**: two regions can write the same row simultaneously, and you need a deterministic rule for what wins. Options ranked by data-loss risk: **last-write-wins** (a timestamp picks one, drops the other — simple, and lossy under any clock skew), **CRDTs** (merges are commutative, associative, and idempotent — no loss, but you only get the data types CRDTs cover: counters, grow-only sets, OR-sets, LWW-registers, and a few list/map variants with their own caveats), and **application-level merge** (custom code per type — no loss, full flexibility, expensive to build and reason about).
 
 ### Leaderless (Dynamo-style)
 
@@ -41,17 +35,45 @@ There is no leader. The client (or a coordinator) writes to **N** replicas and r
 
 These are independent of model — they describe *when the write returns to the client*.
 
+Synchronous: leader waits for every follower to ack before replying to the client.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant L as Leader
+    participant F as Follower(s)
+    C->>L: write
+    L->>F: replicate
+    F-->>L: ack
+    L-->>C: ack
 ```
-sync:       client -> leader -> follower(s)
-            client <- leader <- (ack)
-                       ^ leader blocks until follower ack(s) before replying
 
-async:      client -> leader -> client
-                         \-> follower (fire-and-forget)
+Asynchronous: leader replies as soon as it has the write locally; followers catch up on their own.
 
-semi-sync:  client -> leader -> follower(s)
-            client <- leader <- (ack from >= 1 follower)
-                       ^ leader blocks until at least one follower acks
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant L as Leader
+    participant F as Follower
+    C->>L: write
+    L-->>C: ack
+    L->>F: replicate (fire-and-forget)
+```
+
+Semi-synchronous: leader waits for at least one follower ack, the rest catch up async.
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant L as Leader
+    participant F1 as Follower (sync)
+    participant F2 as Follower (async)
+    C->>L: write
+    L->>F1: replicate
+    L->>F2: replicate
+    F1-->>L: ack
+    L-->>C: ack
+    F2-->>L: ack (later)
 ```
 
 **Synchronous** waits for replica acks before acknowledging the client. Strong durability — a committed write survives leader loss — but write latency equals the slowest replica, and one slow replica stalls every writer. **Asynchronous** acks the client as soon as the leader has the write; replicas catch up on their own time. Fast writes, but a leader crash loses everything not yet shipped — measured as RPO in seconds. **Semi-synchronous** waits for at least one replica ack: durability of "at least two copies" without the liveness problems of full sync.
@@ -90,7 +112,7 @@ Anti-signals:
 
 ## 5. Real-world and interviewer probes
 
-In the wild, **Postgres** does single-leader streaming replication with sync, async, and semi-sync modes (`synchronous_commit`, `synchronous_standby_names`). **MySQL** uses binlog replication, single-leader, with semi-sync available. **MongoDB** replica sets are single-leader with Raft-like elections. **Cassandra** and **DynamoDB** are leaderless with tunable quorums (`R`, `W`, `N`). **CockroachDB** and **Spanner** replicate per-range with Raft, giving per-range single-leader semantics globally. **Kafka** elects a leader per partition and replicates to in-sync replicas (the ISR set); `acks=all` waits for every ISR replica.
+In the wild, **Postgres** does single-leader streaming replication, with `synchronous_commit` controlling the durability point per transaction — `off` (async, may lose committed writes on crash), `local` (fsync to local WAL only), `on` (default; sync to one named standby's WAL), `remote_write` (standby has it in OS buffers), `remote_apply` (standby has applied it and queries see it). The set of synchronous standbys is named in `synchronous_standby_names`. **MySQL** uses binlog replication, single-leader, with semi-sync available via `rpl_semi_sync_master_enabled` (and a timeout that silently degrades to async on stall — read the fine print). **MongoDB** replica sets are single-leader with Raft-like elections; `writeConcern: "majority"` is the durable default. **Cassandra** and **DynamoDB** are leaderless with tunable quorums (`R`, `W`, `N`). **CockroachDB** and **Spanner** replicate per-range with Raft, giving per-range single-leader semantics globally. **Kafka** elects a leader per partition and replicates to in-sync replicas (the ISR set); `acks=all` waits for every member of the **current** ISR — which can shrink to one under failure unless you also set `min.insync.replicas` to reject writes when the ISR is too small.
 
 Probes you should expect:
 

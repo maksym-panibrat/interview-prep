@@ -2,7 +2,7 @@
 
 ## 1. TL;DR
 
-The **strangler fig** pattern incrementally replaces a legacy system by routing slices of its traffic to a new system, one slice at a time, until the legacy is starved of work and can be removed. The name comes from the strangler-fig vine that grows around a host tree until the host dies inside the lattice — there is no big-bang cutover and no maintenance window; the old system keeps serving production while a new system grows beside it. This is the default playbook for any non-trivial migration, and the part most teams get wrong is not the routing scaffolding but the discipline to actually finish: budget the decommission step or you will live with both systems forever.
+The **strangler fig** pattern incrementally replaces a legacy system by routing slices of its traffic to a new system, one slice at a time, until the legacy is starved of work and can be removed. The name comes from the strangler-fig vine that grows around a host tree until the host dies inside the lattice — there is no big-bang cutover and no maintenance window; the old system keeps serving production while a new system grows beside it. This is the default playbook for any non-trivial migration. The part most teams get wrong is not the routing scaffolding but actually finishing: a strangler that never decommissions the legacy is just two production systems forever.
 
 ## 2. How it works
 
@@ -12,21 +12,11 @@ Six recurring moves. None are exotic; the value is doing them in order and not s
 
 The make-or-break component. A proxy sits in front of legacy and decides per-request whether to route to legacy or to new:
 
-```
-                 +---------------------+
-                 |   Routing facade    |
-   client -----> | (gateway / BFF /    |
-                 |  ambassador / SDK)  |
-                 +----------+----------+
-                            |
-              if slice in N |  else
-                            |
-              +-------------+-------------+
-              |                           |
-              v                           v
-       +-----------+               +-------------+
-       |  New svc  |               |  Legacy svc |
-       +-----------+               +-------------+
+```mermaid
+graph LR
+    Client[Client] --> Facade[Routing facade<br/>gateway / BFF / ambassador / SDK]
+    Facade -->|slice in N| New[New service]
+    Facade -->|else| Legacy[Legacy service]
 ```
 
 The facade can live anywhere a request passes through: an API gateway, a BFF, an ambassador sidecar, an SDK shim, or a feature flag inside the legacy itself. What matters is that it can pattern-match on something stable — endpoint, tenant, cohort, header, percentage — and that the rules are versioned, observable, and reversible. Treat the facade as a first-class production system; this is where outages will happen.
@@ -49,7 +39,7 @@ Flip the routing rule for the slice: the facade now serves it from the new syste
 
 ### Backfill data ownership
 
-If the data lived in the legacy database, decide who owns the write path during and after the slice cuts over. Three common shapes:
+If the data lived in the legacy database, decide who owns the write path during and after the slice cuts over. During shadow, legacy still owns writes — the new system's write path is exercised only against a parallel store or discarded after comparison; never let two systems commit to the canonical store unobserved. After cutover, three common shapes:
 
 - **New owns writes; legacy reads via [CDC](outbox-cdc.md)** until legacy callers are also migrated.
 - **Legacy owns writes; new reads via CDC** — useful when you can't yet trust new on the write path.

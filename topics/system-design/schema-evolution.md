@@ -22,48 +22,46 @@ The first thing to nail down on a given data path is which direction of compatib
 - **Remove a field.** Two-step: deprecate first (stop reading it in code, leave it in the schema), wait until every reader is on a version that no longer requires it, *then* drop it from the schema and **reserve the field number**. The reservation is non-negotiable — see §4.
 - **Rename a field.** Only the human-readable name changes; the field number / Avro fingerprint / Thrift tag is the wire identity, and the wire doesn't care what you call it in source.
 - **Change a type.** Almost always breaking. The safe move is a *new* field with the new type, dual-write for a window, migrate readers, then deprecate the old field on the schedule above.
-- **Required fields are forever.** A `required` field can never be safely removed (breaks old readers) or added (breaks old data). Modern Protobuf (proto3) removed `required` for exactly this reason. Use optional with a default and validate in code.
+- **Required fields are forever.** A `required` field can never be safely removed (breaks old readers) or added (breaks old data). Modern Protobuf (proto3) removed `required` for exactly this reason. Avro has no `required` keyword at all — a field is required iff it has no default, so giving every field a sensible default is how you keep the schema evolvable. Use optional-with-default and validate in code.
 
 ### Expand-contract migrations (databases)
 
 Any non-trivial DB migration on a live system runs in four phases. Worked example: changing `users.name TEXT` into `first_name` / `last_name`.
 
-```
-phase 1: EXPAND
-  ALTER TABLE users
-    ADD COLUMN first_name TEXT,
-    ADD COLUMN last_name  TEXT;
-  -- writers dual-write: name AND (first_name, last_name)
-  -- readers still read name
-```
-
-```
-phase 2: BACKFILL
-  UPDATE users
-     SET first_name = split_part(name, ' ', 1),
-         last_name  = split_part(name, ' ', 2)
-   WHERE first_name IS NULL;
-  -- chunked, throttled, resumable; do not lock the table
+```mermaid
+flowchart LR
+    E[EXPAND<br/>add new columns<br/>writers dual-write<br/>readers on old]
+    B[BACKFILL<br/>chunked update<br/>old data into<br/>new columns]
+    M[MIGRATE READERS<br/>deploy readers<br/>on new columns<br/>dual-write continues]
+    C[CONTRACT<br/>stop dual-write<br/>safety window<br/>drop old column]
+    E --> B --> M --> C
+    M -. rollback path .-> E
 ```
 
-```
-phase 3: MIGRATE READERS
-  -- deploy code that reads first_name / last_name
-  -- still dual-writing, so a rollback to old code still works
-```
+The illustrative SQL:
 
 ```
-phase 4: CONTRACT
-  -- writers stop populating name
-  -- safety window, then:
-  ALTER TABLE users DROP COLUMN name;
+-- EXPAND
+ALTER TABLE users
+  ADD COLUMN first_name TEXT,
+  ADD COLUMN last_name  TEXT;
+
+-- BACKFILL (chunked, throttled, resumable; never one big UPDATE)
+UPDATE users
+   SET first_name = split_part(name, ' ', 1),
+       last_name  = split_part(name, ' ', 2)
+ WHERE id BETWEEN :lo AND :hi
+   AND first_name IS NULL;
+
+-- CONTRACT (after readers migrated and the safety window has passed)
+ALTER TABLE users DROP COLUMN name;
 ```
 
-The safety window between phases 3 and 4 is the rollback path. Until you've sat in dual-write long enough that no in-flight code path still depends on `name`, dropping it turns a deploy regression into data loss.
+The safety window between MIGRATE READERS and CONTRACT is the rollback path. Until you've sat in dual-write long enough that no in-flight code path still depends on `name`, dropping it turns a deploy regression into data loss. Rolling back from MIGRATE READERS is cheap (redeploy old code, dual-write was still running); rolling back from CONTRACT means restoring from backup.
 
 ### Schema registry
 
-A **schema registry** holds every version of every schema and enforces a compatibility policy at registration time. Producers register the schema they intend to write under a *subject* (typically one per topic); the registry rejects registrations that break the subject's compatibility setting. Consumers fetch by ID and decode. The pre-deploy check is the value: a producer trying to ship a `required` field addition or a field-number reuse is stopped before it poisons the topic.
+A **schema registry** holds every version of every schema and enforces a compatibility policy at registration time. Producers register the schema they intend to write under a *subject* (typically one per topic); the registry rejects registrations that break the subject's compatibility setting (`BACKWARD`, `FORWARD`, `FULL`, or the `_TRANSITIVE` variants that check against every prior version, not just the latest). Consumers fetch by schema ID and decode. The pre-deploy check is the value: a producer trying to ship a `required` field addition or a field-number reuse is stopped before it poisons the topic. Pick the mode deliberately — Confluent defaults to `BACKWARD`, which is fine for a single-consumer topic and quietly wrong for any topic where producers and consumers deploy independently.
 
 ### Versioned events
 
@@ -102,7 +100,7 @@ Anti-signals:
 
 ## 5. Real-world and interviewer probes
 
-In the wild, **Confluent Schema Registry** is the dominant Kafka implementation, supporting Avro, Protobuf, and JSON Schema with per-subject compatibility policies (`BACKWARD`, `FORWARD`, `FULL`, plus `_TRANSITIVE` variants that enforce against every prior version, not just the latest). LinkedIn, where Kafka and Avro both originated, runs the largest deployment of the pattern. Google's **Protobuf style guide** codifies the field-number-reservation and never-reuse rules. Postgres `ALTER TABLE` semantics — `ADD COLUMN ... NOT NULL DEFAULT` historically rewrote the table — drove expand-contract into widespread practice. **Stripe's API versioning by date** is the alternative shape: the caller pins a version (`Stripe-Version: 2024-10-01`), the server runs every request through a chain of version transformers. Different geometry, same goal.
+In the wild, **Confluent Schema Registry** is the dominant Kafka implementation, supporting Avro, Protobuf, and JSON Schema with per-subject compatibility policies (`BACKWARD`, `FORWARD`, `FULL`, plus `_TRANSITIVE` variants that enforce against every prior version, not just the latest). LinkedIn, where Kafka and Avro both originated, runs the largest deployment of the pattern. Google's **Protobuf style guide** codifies the field-number-reservation and never-reuse rules. Postgres `ALTER TABLE` semantics drove expand-contract into widespread practice — `ADD COLUMN ... NOT NULL DEFAULT <const>` rewrote the entire table on every release before PG11 (2018), which made non-volatile defaults a metadata-only operation. A volatile default (e.g. `DEFAULT random()`, `DEFAULT now()` on some versions) still triggers the rewrite, and adding a `CHECK` or `FOREIGN KEY` constraint without `NOT VALID` still scans the table — the lesson generalizes well past Postgres. **Stripe's API versioning by date** is the alternative shape: the caller pins a version (`Stripe-Version: 2024-10-01`), the server runs every request through a chain of version transformers. Different geometry, same goal.
 
 Probes you should expect:
 
